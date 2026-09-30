@@ -98,3 +98,115 @@ html, body {
 .pl-dl dt { color: var(--pl-muted); }
 .pl-dl dd { margin: 0; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .pl-dl { grid-template-columns: 1fr; } .pl-dl dd { margin-bottom: 8px; } }
+
+/* --- Phase 1: list, inspector, dialogs ------------------------------------ */
+.pl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.pl-icon { width: var(--pl-touch); padding: 0; font-size: 22px; line-height: 1; }
+.pl-body { flex: 1; display: flex; min-height: 0; }
+.pl-main-wide { max-width: none; overflow-x: hidden; }
+
+.pl-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.pl-toolbar select, .pl-field select, .pl-field input, .pl-field textarea, .pl-picker input, .pl-row-inline input {
+  min-height: var(--pl-touch); padding: 0 10px; border-radius: var(--pl-radius);
+  border: 1px solid var(--pl-border); background: var(--pl-surface); color: var(--pl-text); font: inherit; width: 100%;
+}
+.pl-toolbar select { width: auto; }
+.pl-field textarea { padding: 10px; min-height: 120px; resize: vertical; line-height: 1.45; }
+
+.pl-tree { border: 1px solid var(--pl-border); border-radius: var(--pl-radius); overflow: hidden; }
+.pl-trow {
+  display: grid; align-items: center; gap: 8px; min-height: var(--pl-touch);
+  grid-template-columns: minmax(0, 1fr) 90px 104px 110px 100px 70px 110px;
+  padding: 0 12px; border-top: 1px solid var(--pl-border); background: var(--pl-surface);
+}
+.pl-trow:first-child { border-top: 0; }
+.pl-trow.pl-head { min-height: 36px; font-size: 13px; color: var(--pl-muted); background: var(--pl-bg); }
+.pl-trow.selected { background: var(--pl-surface-2); box-shadow: inset 3px 0 0 var(--pl-accent); }
+.pl-trow.context { opacity: 0.7; }
+.pl-trow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.c-title { display: flex; align-items: center; gap: 6px; }
+.pl-twisty { flex: none; width: 28px; height: 28px; display: inline-grid; place-items: center; border: 0; background: none; color: var(--pl-muted); font-size: 14px; cursor: pointer; padding: 0; }
+.pl-title { flex: 0 1 auto; min-width: 0; min-height: var(--pl-touch); border: 0; background: none; color: var(--pl-text); font: inherit; font-size: 15px; text-align: left; cursor: pointer; padding: 0 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-title.t-project { font-weight: 700; }
+.pl-title.t-subproject { font-weight: 600; }
+.pl-title:focus-visible, .pl-twisty:focus-visible { outline: 2px solid var(--pl-highlight); outline-offset: -2px; }
+
+.pl-badge { flex: none; font-size: 11px; padding: 1px 6px; border-radius: 999px; border: 1px solid; }
+.b-blocked { color: #f0a58f; border-color: var(--pl-blocked); }
+.b-overdue { color: var(--pl-highlight); border-color: var(--pl-highlight); }
+.b-problem { color: var(--pl-highlight); border-color: var(--pl-border); }
+.pl-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--pl-accent); }
+.pl-overdue { color: #f0a58f; }
+
+.pl-pill { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--pl-border); }
+.st-idea { color: var(--pl-muted); }
+.st-active { color: #1c1714; background: var(--pl-progress); border-color: var(--pl-progress); }
+.st-hold { color: var(--pl-text); background: var(--pl-blocked); border-color: var(--pl-blocked); }
+.st-done { color: #1c1714; background: var(--pl-done); border-color: var(--pl-done); }
+.st-archived { color: var(--pl-muted); opacity: var(--pl-dim); }
+
+.c-progress { display: flex; align-items: center; gap: 6px; }
+.pl-bar { flex: 1; height: 6px; border-radius: 3px; background: var(--pl-bg); overflow: hidden; }
+.pl-bar-fill { display: block; height: 100%; background: var(--pl-progress); }
+.pl-pct { font-size: 12px; color: var(--pl-muted); width: 34px; text-align: right; }
+.pl-empty { padding: 16px; margin: 0; }
+
+.pl-inspector {
+  width: 420px; flex: none; border-left: 1px solid var(--pl-border); background: var(--pl-surface);
+  padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
+}
+.pl-inspector-head { display: flex; justify-content: space-between; align-items: center; }
+.pl-field { display: flex; flex-direction: column; gap: 6px; }
+.pl-field-label { font-size: 13px; color: var(--pl-muted); font-weight: 600; }
+.pl-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pl-problems { margin: 0; padding-left: 18px; font-size: 14px; }
+.pl-picker { display: flex; flex-direction: column; gap: 6px; position: relative; }
+.pl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pl-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; border-radius: 999px; background: var(--pl-surface-2); border: 1px solid var(--pl-border); font-size: 14px; }
+.pl-chip button { border: 0; background: none; color: var(--pl-muted); font-size: 18px; width: 28px; height: 28px; cursor: pointer; }
+.pl-options { list-style: none; margin: 0; padding: 4px; position: absolute; top: 100%; left: 0; right: 0; z-index: 5; background: var(--pl-surface-2); border: 1px solid var(--pl-border); border-radius: var(--pl-radius); max-height: 320px; overflow-y: auto; }
+.pl-options button { width: 100%; min-height: var(--pl-touch); display: flex; justify-content: space-between; gap: 8px; align-items: center; border: 0; background: none; color: var(--pl-text); font: inherit; text-align: left; padding: 0 10px; border-radius: 6px; cursor: pointer; }
+.pl-options button:hover, .pl-options button:focus-visible { background: var(--pl-border); }
+.pl-link-button { border: 0; background: none; color: var(--pl-highlight); font: inherit; padding: 4px 0; cursor: pointer; text-align: left; }
+.pl-row-inline { display: flex; gap: 8px; align-items: center; }
+.pl-row-inline a.pl-button { display: inline-flex; align-items: center; text-decoration: none; }
+.pl-ellipsis { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: var(--pl-muted); }
+.pl-inspector a { color: var(--pl-highlight); }
+
+.pl-modal-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.55); display: grid; place-items: center; padding: 16px; z-index: 20; }
+.pl-modal { width: min(480px, 100%); margin: 0; max-height: 90dvh; overflow-y: auto; }
+.pl-segmented { display: flex; border: 1px solid var(--pl-border); border-radius: var(--pl-radius); overflow: hidden; }
+.pl-segmented button { flex: 1; min-height: var(--pl-touch); border: 0; background: var(--pl-bg); color: var(--pl-text); font: inherit; cursor: pointer; }
+.pl-segmented button.on { background: var(--pl-accent); color: #1c1714; font-weight: 600; }
+.pl-form select { min-height: var(--pl-touch); padding: 0 10px; border-radius: var(--pl-radius); border: 1px solid var(--pl-border); background: var(--pl-bg); color: var(--pl-text); font: inherit; }
+
+/* The list adapts to the space it has (not the window), so it stays usable
+   beside the inspector. */
+.pl-listview { container-type: inline-size; }
+@container (max-width: 720px) {
+  .pl-trow { grid-template-columns: minmax(0, 1fr) 96px 64px 64px; }
+  .c-type, .c-owner, .c-domain { display: none; }
+  .c-progress .pl-bar { display: none; }
+}
+@container (max-width: 380px) {
+  /* Badges shrink to coloured dots so titles keep their room. */
+  .b-blocked, .b-overdue { font-size: 0; width: 10px; height: 10px; padding: 0; border: 0; }
+  .b-blocked { background: var(--pl-blocked); }
+  .b-overdue { background: var(--pl-highlight); }
+  .pl-trow { padding: 0 8px; grid-template-columns: minmax(0, 1fr) 92px 56px; }
+  .pl-trow > span:nth-child(7) { display: none; }
+}
+
+/* Narrow screens: inspector becomes a bottom sheet. */
+@media (max-width: 899px) {
+  .pl-inspector {
+    position: fixed; left: 0; right: 0; bottom: 0; width: auto; max-height: 78dvh; z-index: 10;
+    border-left: 0; border-top: 1px solid var(--pl-accent); border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 24px rgb(0 0 0 / 0.5);
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
+@media (max-width: 420px) {
+  .pl-main { padding: 12px; }
+  .pl-header { padding-left: 12px; padding-right: 12px; }
+}

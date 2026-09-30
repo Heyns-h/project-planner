@@ -19,12 +19,12 @@ function ago(iso: string | null): string {
 
 function statusText(snap: Snapshot): string {
   switch (snap.status.s) {
-    case 'pulling':
+    case 'syncing':
       return 'Syncing…';
     case 'offline':
       return 'Offline — showing saved data';
     case 'unauthorized':
-      return 'Token rejected — reconnect in Settings';
+      return 'Token rejected — replace it in Settings';
     case 'rate-limited':
       return `GitHub rate limit — retrying after ${new Date(snap.status.retryAt).toLocaleTimeString()}`;
     case 'error':
@@ -40,6 +40,12 @@ export function StatusBar({ snap, offlineReady }: { snap: Snapshot; offlineReady
   return (
     <footer class="pl-status" aria-live="polite">
       {snap.config && <span class={bad ? 'pl-warn' : ''}>{statusText(snap)}</span>}
+      {snap.pending > 0 && (
+        <span class="pl-warn">
+          {snap.pending} change{snap.pending === 1 ? '' : 's'} not synced
+          {snap.conflicts.length > 0 && ` · ${snap.conflicts.length} need${snap.conflicts.length === 1 ? 's' : ''} a decision`}
+        </span>
+      )}
       {days !== null && days <= 14 && (
         <span class="pl-warn">{days < 0 ? 'Token expired' : `Token expires in ${days} day${days === 1 ? '' : 's'}`}</span>
       )}
