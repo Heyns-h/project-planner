@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dev-dist/
+*.log
+.DS_Store
+Thumbs.db
+
+# Local only: dotpm trial vault (own git repo) and a working clone of the sandbox data repo
+test-vault/
+sandbox-clone/
+.claude/
+docs/
