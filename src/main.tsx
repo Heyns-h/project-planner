@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { registerSW } from 'virtual:pwa-register';
+import { Session } from './app/session';
 import { App } from './ui/App';
 import './ui/theme.css';
 
@@ -14,7 +15,7 @@ function framed(): boolean {
   }
 }
 
-function Root() {
+function Root({ session }: { session: Session }) {
   const [updateReady, setUpdateReady] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
   const [update] = useState(() =>
@@ -29,7 +30,9 @@ function Root() {
     if (!('serviceWorker' in navigator)) return;
     void navigator.serviceWorker.ready.then(() => setOfflineReady(true));
   }, []);
-  return <App updateReady={updateReady} offlineReady={offlineReady} onUpdate={() => void update(true)} />;
+  return (
+    <App session={session} updateReady={updateReady} offlineReady={offlineReady} onUpdate={() => void update(true)} />
+  );
 }
 
 const root = document.getElementById('app');
@@ -37,5 +40,9 @@ if (!root) throw new Error('#app missing');
 if (framed()) {
   root.textContent = 'Project Planner cannot run inside a frame.';
 } else {
-  render(<Root />, root);
+  const session = new Session();
+  render(<Root session={session} />, root);
+  session.open().catch((e: unknown) => {
+    root.textContent = `Cannot open local storage: ${e instanceof Error ? e.message : String(e)}`;
+  });
 }
