@@ -10,3 +10,4 @@ test-vault/
 sandbox-clone/
 .claude/
 docs/
+*.local.test.ts

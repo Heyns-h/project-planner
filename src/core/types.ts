@@ -40,6 +40,7 @@ export type ProblemCode =
 
 export interface Problem {
   code: ProblemCode;
+  severity: 'error' | 'warning';
   message: string;
   field?: string;
 }
