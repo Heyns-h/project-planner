@@ -20,6 +20,7 @@ export interface IndexEntry {
 export interface Meta {
   config: RepoConfig;
   lastSync: string | null; // commit sha
+  lastTree: string | null; // that commit's root tree sha (push needs it as base_tree)
   lastSyncAt: string | null; // ISO time
   refEtag: string | null;
   persisted: boolean | null;
@@ -110,6 +111,7 @@ export class Store {
     put: RepoFile[];
     remove: string[];
     commit: string;
+    tree: string;
     etag: string | null;
     at: string;
   }): Promise<void> {
@@ -122,15 +124,64 @@ export class Store {
     for (const path of p.remove) files.delete(path);
     const meta = t.objectStore('meta');
     meta.put(p.commit, 'lastSync');
+    meta.put(p.tree, 'lastTree');
     meta.put(p.at, 'lastSyncAt');
     meta.put(p.etag, 'refEtag');
     await done(t);
   }
 
-  // --- queue (Phase 1) --------------------------------------------------
+  // --- queue ------------------------------------------------------------
 
+  /** All queued ops in queue order. */
   async queued(): Promise<QueuedOp[]> {
-    return (await req(this.tx('queue', 'readonly').objectStore('queue').getAll())) as QueuedOp[];
+    const all = (await req(this.tx('queue', 'readonly').objectStore('queue').getAll())) as QueuedOp[];
+    return all.sort((a, b) => a.seq - b.seq);
+  }
+
+  /**
+   * Append one batch. Resolves only once it is durably stored, so the UI can
+   * show an edit as saved only after this returns (plan §6).
+   */
+  async enqueue(ops: Omit<QueuedOp, 'seq'>[]): Promise<QueuedOp[]> {
+    const existing = await this.queued();
+    let seq = existing.length ? (existing[existing.length - 1]?.seq ?? 0) + 1 : 1;
+    const withSeq = ops.map((o) => ({ ...o, seq: seq++ }));
+    const t = this.tx('queue', 'readwrite');
+    const q = t.objectStore('queue');
+    for (const o of withSeq) q.put(o);
+    await done(t);
+    return withSeq;
+  }
+
+  /** Replace ops (conflict flags, or a resolved op) and delete others, in one transaction. */
+  async updateQueue(put: QueuedOp[], remove: string[]): Promise<void> {
+    const t = this.tx('queue', 'readwrite');
+    const q = t.objectStore('queue');
+    for (const o of put) q.put(o);
+    for (const id of remove) q.delete(id);
+    await done(t);
+  }
+
+  /**
+   * Record a successful push in one transaction: the pushed files become the
+   * new base, the sync position moves to the new commit, and the pushed or
+   * redundant ops leave the queue. A crash either keeps everything queued
+   * (and the next sync finds the ops redundant) or completes all of it.
+   */
+  async applyPush(p: { put: RepoFile[]; index: IndexEntry[]; commit: string; tree: string; removeOps: string[]; at: string }): Promise<void> {
+    const t = this.tx(['files', 'index', 'meta', 'queue'], 'readwrite');
+    const files = t.objectStore('files');
+    for (const f of p.put) files.put(f);
+    const idx = t.objectStore('index');
+    for (const e of p.index) idx.put(e);
+    const q = t.objectStore('queue');
+    for (const id of p.removeOps) q.delete(id);
+    const meta = t.objectStore('meta');
+    meta.put(p.commit, 'lastSync');
+    meta.put(p.tree, 'lastTree');
+    meta.put(p.at, 'lastSyncAt');
+    meta.put(null, 'refEtag'); // next check fetches the ref, sees our own commit, and stops there
+    await done(t);
   }
 
   // --- forget -----------------------------------------------------------

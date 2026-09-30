@@ -16,6 +16,7 @@ describe('Store', () => {
       put: [{ path: 'a.md', sha: '1', content: 'A' }],
       remove: [],
       commit: 'c1',
+      tree: 't1',
       etag: '"c1"',
       at: '2026-09-30T00:00:00.000Z',
     });

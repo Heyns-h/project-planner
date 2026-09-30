@@ -110,13 +110,21 @@ export type Field =
   | 'references'
   | 'drive';
 
+/** Input for a new node file (serialize.newNodeContent). */
 export interface NewNode {
   id: string;
   plannerType: PlannerType;
   title: string;
   domain: Domain;
   parent: Stem | null;
-  fields?: Partial<Record<Field, unknown>>;
+  owner?: Stem | null;
+  status?: StoredStatus;
+  priority?: Priority;
+  tags?: string[];
+  start?: string | null;
+  due?: string | null;
+  blockedBy?: Stem[];
+  body?: string;
 }
 
 export interface NewPerson {
@@ -134,9 +142,11 @@ export type Op =
 export interface QueuedOp {
   opId: string;
   batchId: string; // one UI action = one batch
+  summary: string; // the batch's description, for commit messages, e.g. "edit 'Buy glue' (status)"
   op: Op;
   at: string; // ISO timestamp, device-local
   device: string;
+  seq: number; // queue order
   conflict?: Conflict;
 }
 

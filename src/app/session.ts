@@ -2,7 +2,7 @@ import { classify } from '../core/classify';
 import { detectDomains, domainForPath } from '../core/domains';
 import type { DomainDef, RepoConfig } from '../core/types';
 import { Store } from '../store/db';
-import { pull } from '../sync/engine';
+import { sync } from '../sync/engine';
 import { GitHub, GitHubError, OfflineError } from '../sync/github';
 
 // Framework-free session: owns the store, the GitHub client and the sync state.
@@ -127,8 +127,13 @@ export class Session {
     this.busy = true;
     this.set({ status: { s: 'pulling' } });
     try {
-      const r = await pull(gh, store, config.branch);
-      if (r.changed) {
+      const r = await sync(gh, store, {
+        branch: config.branch,
+        device: config.device,
+        domains: config.domains,
+        today: localToday,
+      });
+      if (r.pulled.changed || r.pushed) {
         if (config.domains.length === 0) {
           const domains = detectDomains((await store.allIndex()).map((e) => e.path));
           const updated = { ...config, domains };
@@ -178,6 +183,12 @@ export class Session {
     this.gh = null;
     this.set({ config: null, lastCommit: null, lastSyncAt: null, persisted: null, counts: EMPTY_COUNTS, status: { s: 'idle' } });
   }
+}
+
+/** Today's date in the device's time zone, YYYY-MM-DD. */
+export function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function statusFor(e: unknown): SyncStatus {

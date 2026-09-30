@@ -106,6 +106,60 @@ export class GitHub {
     const res = await this.call(`/git/blobs/${sha}`, { accept: 'application/vnd.github.raw+json' });
     return await res.text();
   }
+
+  // --- writes: three requests per push (G5, G8) --------------------------
+
+  private async send<T>(method: 'POST' | 'PATCH', path: string, body: unknown): Promise<T> {
+    const res = await this.call(path, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return (await res.json()) as T;
+  }
+
+  /** New tree on top of `baseTree`, with contents inline (no separate blob calls). */
+  async createTree(baseTree: string, writes: readonly TreeWrite[]): Promise<{ sha: string; entries: TreeEntry[] }> {
+    if (writes.some((w) => w.path.startsWith('.github/'))) throw new Error('The planner never writes under .github/'); // G6
+    const tree = writes.map((w) =>
+      w.content === null
+        ? { path: w.path, mode: '100644', type: 'blob', sha: null }
+        : { path: w.path, mode: '100644', type: 'blob', content: w.content },
+    );
+    const body = await this.send<{ sha: string; tree: TreeEntry[] }>('POST', '/git/trees', { base_tree: baseTree, tree });
+    return { sha: body.sha, entries: body.tree ?? [] };
+  }
+
+  async createCommit(message: string, tree: string, parent: string): Promise<string> {
+    const body = await this.send<{ sha: string }>('POST', '/git/commits', { message, tree, parents: [parent] });
+    return body.sha;
+  }
+
+  /**
+   * Move the branch to `sha` without force. If someone pushed in between,
+   * GitHub answers 409 or 422 (the exact code is undocumented, G5a):
+   * reported as `BranchMovedError`.
+   */
+  async updateRef(branch: string, sha: string): Promise<void> {
+    try {
+      await this.send('PATCH', `/git/refs/heads/${encodeURIComponent(branch)}`, { sha, force: false });
+    } catch (e) {
+      if (e instanceof GitHubError && (e.status === 409 || e.status === 422)) throw new BranchMovedError(e.message);
+      throw e;
+    }
+  }
+}
+
+export class BranchMovedError extends Error {
+  constructor(detail: string) {
+    super(`Branch moved during push (${detail})`);
+    this.name = 'BranchMovedError';
+  }
+}
+
+export interface TreeWrite {
+  path: string;
+  content: string | null; // null deletes the file (G5)
 }
 
 /** All blob paths under a tree, walking sub-trees when the recursive listing is truncated (G2). */
