@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { Session, Snapshot } from '../app/session';
 import { startTriggers } from '../sync/triggers';
+import { BubbleView } from './BubbleView';
 import { ConflictDialog } from './ConflictDialog';
+import { loadLocal, saveLocal } from './format';
 import { Inspector } from './Inspector';
 import { ListView } from './ListView';
 import { QuickAdd } from './QuickAdd';
@@ -22,6 +24,13 @@ export function App({ session, updateReady, onUpdate, offlineReady }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [resolving, setResolving] = useState(false);
+  // Bubble by default on a device's first start, then the last used view (decision 4).
+  const [mode, setModeState] = useState<'bubble' | 'list'>(() => loadLocal('view', 'bubble'));
+  const setMode = (m: 'bubble' | 'list') => {
+    setModeState(m);
+    saveLocal('view', m);
+  };
+  const root = null; // view root: drill-in arrives in step 2b
 
   useEffect(() => session.subscribe(setSnap), [session]);
 
@@ -57,6 +66,15 @@ export function App({ session, updateReady, onUpdate, offlineReady }: Props) {
       )}
       <header class="pl-header">
         <h1>Planner</h1>
+        {connected && view === 'home' && (
+          <div class="pl-segmented pl-viewtoggle" role="radiogroup" aria-label="View">
+            {(['bubble', 'list'] as const).map((m) => (
+              <button type="button" key={m} role="radio" aria-checked={mode === m} class={mode === m ? 'on' : ''} onClick={() => setMode(m)}>
+                {m === 'bubble' ? 'Bubbles' : 'List'}
+              </button>
+            ))}
+          </div>
+        )}
         {connected && (
           <div class="pl-header-actions">
             {view === 'home' && (
@@ -79,9 +97,15 @@ export function App({ session, updateReady, onUpdate, offlineReady }: Props) {
         <Settings session={session} snap={snap} onClose={() => setView('home')} />
       ) : (
         <div class={`pl-body${selected ? ' with-inspector' : ''}`}>
-          <main class="pl-main pl-main-wide">
-            <ListView snap={snap} selectedId={selectedId} onSelect={setSelectedId} />
-          </main>
+          {mode === 'bubble' ? (
+            <main class="pl-main pl-main-fill">
+              <BubbleView snap={snap} root={root} selectedId={selectedId} onSelect={setSelectedId} />
+            </main>
+          ) : (
+            <main class="pl-main pl-main-wide">
+              <ListView snap={snap} selectedId={selectedId} onSelect={setSelectedId} />
+            </main>
+          )}
           {selected && (
             <Inspector
               key={selected.id}
