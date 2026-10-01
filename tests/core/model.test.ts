@@ -144,11 +144,26 @@ describe('roll-up (blueprint §4.6)', () => {
     expect(archived.get('N1')?.total).toBe(3);
   });
 
-  it('shows blocked when waiting on an unfinished task, and propagates upwards', () => {
+  it('shows blocked when waiting on an unfinished task; a parent is blocked only when every open task beneath is', () => {
     expect(r.get('N7')?.blocked).toBe(true);
     expect(r.get('N7')?.waitingOn.map((n) => n.stem)).toEqual(['paint-gangers']);
-    expect(r.get('N6')?.blocked).toBe(true); // parent of a blocked child
-    expect(r.get('N1')?.blocked).toBe(false);
+    expect(r.get('N6')).toMatchObject({ blocked: true, openTasks: 1, blockedTasks: 1 }); // its only open task is blocked
+    expect(r.get('N1')).toMatchObject({ blocked: false, openTasks: 2, blockedTasks: 0 });
+  });
+
+  it('with some open tasks still free, the parent is not blocked but counts the blocked ones (decision 9)', () => {
+    const partial = computeRollups(graph({ '02-Beta/07-planner/free.md': nodeText({ id: 'N8', type: 'task', title: 'Free', domain: 'beta', parent: 'q4-sourcing' }) }), TODAY);
+    expect(partial.get('N6')).toMatchObject({ blocked: false, openTasks: 2, blockedTasks: 1 });
+    // A task under an on-hold parent counts as impeded through that parent.
+    const held = computeRollups(
+      graph({
+        '02-Beta/07-planner/held.md': nodeText({ id: 'N8', type: 'subproject', title: 'Held', domain: 'beta', parent: 'q4-sourcing', status: 'on-hold' }),
+        '02-Beta/07-planner/under-held.md': nodeText({ id: 'N9', type: 'task', title: 'Under held', domain: 'beta', parent: 'held' }),
+      }),
+      TODAY,
+    );
+    expect(held.get('N6')).toMatchObject({ blocked: true, openTasks: 2, blockedTasks: 2 });
+    expect(held.get('N8')).toMatchObject({ blocked: true });
   });
 
   it('stops blocking once the dependency is done', () => {

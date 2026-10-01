@@ -25,6 +25,8 @@ export interface LayoutNode {
   /** Percent done from the roll-up, or null when nothing to count. */
   percent: number | null;
   blocked: boolean;
+  /** Some, but not all, open tasks beneath are blocked: the wheel is tinted (decision 9). */
+  partial: boolean;
   /** Level 2 only: how many descendants are hidden beneath this circle. */
   beneath: number;
   /** No open tasks: floor size and a darker shade. */
@@ -122,6 +124,7 @@ export function layout(g: Graph, rollups: ReadonlyMap<string, Rollup>, rootId: s
       // A ring only where there is something to roll up; a lone task has no ring.
       percent: desc.some(counted) ? r?.percent ?? null : null,
       blocked: r?.blocked ?? false,
+      partial: !(r?.blocked ?? false) && (r?.blockedTasks ?? 0) > 0,
       beneath: depth === 2 ? desc.filter(shown).length : 0,
       dim: p.data.open === 0,
       children: depth === 1 ? (p.children ?? []).map((c) => toNode(c, 2)) : [],

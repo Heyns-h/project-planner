@@ -5,8 +5,11 @@ import type { Graph, PlannerNode } from './types';
 // Roll-up (blueprint §4.6). Computed in memory, never written to files.
 //  - progress: share of descendant tasks that are done, archived excluded.
 //    A task with no counted sub-tasks counts itself.
-//  - blocked: stored on-hold, or waiting on an unfinished blocked_by target,
-//    or any direct child shown as blocked (so it propagates upwards).
+//  - blocked: the node's own progress is impeded (decision 9, 2026-10-01):
+//    it is stored on-hold or waits on an unfinished blocked_by target, or
+//    EVERY open task beneath it is impeded (itself, or through a parent
+//    below this node). Some but not all → `blockedTasks` > 0 and the UI tints
+//    the progress wheel instead of marking the node blocked.
 //    Done and archived nodes are never shown as blocked.
 //  - overdue: past due and not done, itself or any descendant.
 
@@ -15,6 +18,9 @@ export interface Rollup {
   total: number;
   percent: number | null; // null when there are no tasks to count
   blocked: boolean;
+  /** Open leaf tasks beneath the node, and how many of them are impeded. */
+  openTasks: number;
+  blockedTasks: number;
   waitingOn: PlannerNode[]; // unfinished blocked_by targets
   overdue: boolean;
 }
@@ -22,6 +28,7 @@ export interface Rollup {
 const isDone = (n: PlannerNode) => statusInfo(n.status).done;
 const inRollup = (n: PlannerNode) => statusInfo(n.status).inRollup;
 const closed = (n: PlannerNode) => isDone(n) || n.status === 'archived';
+const openTask = (n: PlannerNode) => n.plannerType === 'task' && inRollup(n) && !isDone(n);
 
 export function computeRollups(g: Graph, today: string): Map<string, Rollup> {
   const waiting = new Map<string, PlannerNode[]>();
@@ -31,38 +38,47 @@ export function computeRollups(g: Graph, today: string): Map<string, Rollup> {
       n.blockedBy.map((s) => nodeByStem(g, s)).filter((t): t is PlannerNode => t !== undefined && !closed(t)),
     );
   }
+  const impeded = (n: PlannerNode) => !closed(n) && (n.status === 'on-hold' || (waiting.get(n.id)?.length ?? 0) > 0);
 
-  const blockedMemo = new Map<string, boolean>();
-  const blocked = (id: string, visiting: Set<string>): boolean => {
-    const known = blockedMemo.get(id);
-    if (known !== undefined) return known;
-    const n = g.nodes.get(id);
-    if (!n || visiting.has(id)) return false; // cycle guard
-    visiting.add(id);
-    const result =
-      !closed(n) &&
-      (n.status === 'on-hold' ||
-        (waiting.get(id)?.length ?? 0) > 0 ||
-        (g.children.get(id) ?? []).some((c) => blocked(c, visiting)));
-    visiting.delete(id);
-    blockedMemo.set(id, result);
-    return result;
+  // An open task is a leaf when nothing open sits beneath it.
+  const descMemo = new Map<string, PlannerNode[]>();
+  const desc = (id: string) => {
+    let d = descMemo.get(id);
+    if (!d) descMemo.set(id, (d = descendants(g, id)));
+    return d;
+  };
+  const isLeaf = (t: PlannerNode) => !desc(t.id).some(openTask);
+
+  // A leaf is impeded by itself or by any parent between it and `top`.
+  const impededUnder = (leaf: PlannerNode, topId: string): boolean => {
+    const seen = new Set<string>();
+    let cur: PlannerNode | undefined = leaf;
+    while (cur && cur.id !== topId && !seen.has(cur.id)) {
+      if (impeded(cur)) return true;
+      seen.add(cur.id);
+      cur = cur.parent ? nodeByStem(g, cur.parent) : undefined;
+    }
+    return false;
   };
 
   const out = new Map<string, Rollup>();
   for (const n of g.nodes.values()) {
-    const desc = descendants(g, n.id);
-    const countedDesc = desc.filter((t) => t.plannerType === 'task' && inRollup(t));
+    const d = desc(n.id);
+    const countedDesc = d.filter((t) => t.plannerType === 'task' && inRollup(t));
     const leaves = countedDesc.length > 0 ? countedDesc : n.plannerType === 'task' && inRollup(n) ? [n] : [];
     const done = leaves.filter(isDone).length;
     const total = leaves.length;
+    const openLeaves = d.filter((t) => openTask(t) && isLeaf(t));
+    const blockedTasks = openLeaves.filter((t) => impededUnder(t, n.id)).length;
     out.set(n.id, {
       done,
       total,
       percent: total === 0 ? null : Math.round((done / total) * 100),
-      blocked: blocked(n.id, new Set()),
+      blocked: impeded(n) || (openLeaves.length > 0 && blockedTasks === openLeaves.length),
+      openTasks: openLeaves.length,
+      blockedTasks,
       waitingOn: waiting.get(n.id) ?? [],
-      overdue: [n, ...desc].some((t) => t.due !== null && t.due < today && !closed(t)),
+      overdue: [n, ...d].some((t) => t.due !== null && t.due < today && !closed(t)),
     });
   }
   return out;

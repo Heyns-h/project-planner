@@ -17,6 +17,7 @@ interface Props {
   onClose: () => void;
   onSelect: (id: string) => void;
   onReview: () => void; // open the conflict dialog
+  onOpen: (id: string) => void; // drill in: make this node the view root
 }
 
 function TextField({ label, value, onSave, multiline, disabled }: { label: string; value: string; onSave: (v: string) => void; multiline?: boolean; disabled?: boolean }) {
@@ -46,7 +47,7 @@ function TextField({ label, value, onSave, multiline, disabled }: { label: strin
   );
 }
 
-export function Inspector({ session, snap, node: n, onClose, onSelect, onReview }: Props) {
+export function Inspector({ session, snap, node: n, onClose, onSelect, onReview, onOpen }: Props) {
   const g = snap.graph;
   const [error, setError] = useState<string | null>(null);
   const ro = n.readOnly;
@@ -86,9 +87,14 @@ export function Inspector({ session, snap, node: n, onClose, onSelect, onReview 
     <aside class="pl-inspector" aria-label={`Edit ${n.title}`}>
       <div class="pl-inspector-head">
         <span class="pl-muted">{TYPE_LABEL[n.plannerType]}</span>
-        <button type="button" class="pl-button" onClick={onClose}>
-          Close
-        </button>
+        <div class="pl-row">
+          <button type="button" class="pl-button" onClick={() => onOpen(n.id)} title="Show what is inside this item">
+            Open
+          </button>
+          <button type="button" class="pl-button" onClick={onClose}>
+            Close
+          </button>
+        </div>
       </div>
 
       {error && (

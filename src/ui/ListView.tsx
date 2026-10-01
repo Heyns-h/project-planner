@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'preact/hooks';
 import type { Snapshot } from '../app/session';
-import { ancestors, childrenOf, roots } from '../core/graph';
+import { ancestors, childrenOf, descendants, roots } from '../core/graph';
 import type { PlannerNode, StoredStatus } from '../core/types';
 import { loadLocal, PRIORITY_LABEL, saveLocal, shortDate, STATUS_CLASS, statusLabel, TYPE_LABEL } from './format';
 
@@ -44,11 +44,13 @@ function matches(n: PlannerNode, f: Filters): boolean {
 
 interface Props {
   snap: Snapshot;
+  root: string | null; // view root id; the list shows its subtree
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onOpen: (id: string) => void; // drill in (double-click a row)
 }
 
-export function ListView({ snap, selectedId, onSelect }: Props) {
+export function ListView({ snap, root, selectedId, onSelect, onOpen }: Props) {
   const g = snap.graph;
   const [filters, setFiltersState] = useState<Filters>(() => loadLocal('filters', { status: 'all', domain: '', sort: 'default' }));
   const [expanded, setExpandedState] = useState<Set<string>>(() => new Set(loadLocal<string[]>('expanded', [])));
@@ -78,16 +80,21 @@ export function ListView({ snap, selectedId, onSelect }: Props) {
     setExpanded(next);
   };
 
-  // Visible set: matching nodes plus their ancestor path.
+  // Visible set: matching nodes plus their ancestor path, up to the view root.
   const visible = useMemo(() => {
     const v = new Set<string>();
+    const inView = root ? new Set(descendants(g, root).map((d) => d.id)) : null;
     for (const n of g.nodes.values()) {
+      if (inView && !inView.has(n.id)) continue;
       if (!matches(n, filters)) continue;
       v.add(n.id);
-      for (const a of ancestors(g, n.id)) v.add(a.id);
+      for (const a of ancestors(g, n.id)) {
+        if (a.id === root) break;
+        v.add(a.id);
+      }
     }
     return v;
-  }, [g, filters]);
+  }, [g, filters, root]);
 
   const rows: { node: PlannerNode; depth: number; hasChildren: boolean; match: boolean }[] = [];
   const cmp = compare(filters.sort);
@@ -99,7 +106,7 @@ export function ListView({ snap, selectedId, onSelect }: Props) {
       if (kids.length && isOpen(n)) walk(kids, depth + 1, new Set([...seen, n.id]));
     }
   };
-  walk(roots(g), 0, new Set());
+  walk(root ? childrenOf(g, root) : roots(g), 0, new Set());
 
   const domains = snap.config?.domains ?? [];
   const owner = (n: PlannerNode) => (n.owner ? g.people.get(n.owner)?.name ?? n.owner : '');
@@ -153,7 +160,11 @@ export function ListView({ snap, selectedId, onSelect }: Props) {
           <span>Due</span>
           <span>Progress</span>
         </div>
-        {rows.length === 0 && <p class="pl-muted pl-empty">{g.nodes.size === 0 ? 'No planner items yet. Use + to add a project.' : 'Nothing matches these filters.'}</p>}
+        {rows.length === 0 && (
+          <p class="pl-muted pl-empty">
+            {g.nodes.size === 0 ? 'No planner items yet. Use + to add a project.' : root && childrenOf(g, root).length === 0 ? 'Nothing under this item yet. Use + to add something.' : 'Nothing matches these filters.'}
+          </p>
+        )}
         {rows.map(({ node: n, depth, hasChildren, match }) => {
           const r = snap.rollups.get(n.id);
           const problems = n.problems.length;
@@ -174,10 +185,15 @@ export function ListView({ snap, selectedId, onSelect }: Props) {
                 ) : (
                   <span class="pl-twisty" aria-hidden="true" />
                 )}
-                <button type="button" class={`pl-title t-${n.plannerType}`} onClick={() => onSelect(n.id)}>
+                <button type="button" class={`pl-title t-${n.plannerType}`} onClick={() => onSelect(n.id)} onDblClick={() => onOpen(n.id)} title="Double-click to open">
                   {n.title}
                 </button>
                 {r?.blocked && <span class="pl-badge b-blocked" title={r.waitingOn.length ? `Waiting on ${r.waitingOn.map((w) => w.title).join(', ')}` : 'Blocked'}>blocked</span>}
+                {r && !r.blocked && r.blockedTasks > 0 && (
+                  <span class="pl-badge b-partial" title={`${r.blockedTasks} of ${r.openTasks} open tasks blocked`}>
+                    {r.blockedTasks} blocked
+                  </span>
+                )}
                 {r?.overdue && <span class="pl-badge b-overdue">overdue</span>}
                 {problems > 0 && <span class="pl-badge b-problem" title={n.problems.map((p) => p.message).join('\n')}>⚠ {problems}</span>}
                 {n.readOnly && <span class="pl-badge b-problem">read-only</span>}
@@ -193,7 +209,7 @@ export function ListView({ snap, selectedId, onSelect }: Props) {
               <span class="c-progress" title={r && r.total ? `${r.done} of ${r.total} tasks done · priority ${PRIORITY_LABEL[n.priority]}` : ''}>
                 {r?.percent !== null && r?.percent !== undefined && (
                   <>
-                    <span class="pl-bar" aria-hidden="true">
+                    <span class={`pl-bar${r.blockedTasks > 0 && !r.blocked ? ' partial' : ''}`} aria-hidden="true">
                       <span class="pl-bar-fill" style={{ width: `${r.percent}%` }} />
                     </span>
                     <span class="pl-pct">{r.percent}%</span>

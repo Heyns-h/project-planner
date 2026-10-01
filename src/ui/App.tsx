@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { installNav, parseHash, type Root } from '../app/nav';
 import type { Session, Snapshot } from '../app/session';
 import { startTriggers } from '../sync/triggers';
+import { Breadcrumb } from './Breadcrumb';
 import { BubbleView } from './BubbleView';
 import { ConflictDialog } from './ConflictDialog';
 import { loadLocal, saveLocal } from './format';
@@ -30,7 +32,17 @@ export function App({ session, updateReady, onUpdate, offlineReady }: Props) {
     setModeState(m);
     saveLocal('view', m);
   };
-  const root = null; // view root: drill-in arrives in step 2b
+
+  // The view root (blueprint §5.3) is a stem in the URL hash; the hash wins
+  // over the root saved on this device, which only fills in when there is none.
+  const [rootStem, setRootStem] = useState<Root>(() => parseHash(location.hash) ?? loadLocal<Root>('root', null));
+  const nav = useRef(installNav(setRootStem));
+  useEffect(() => {
+    const n = nav.current;
+    if (parseHash(location.hash) === null && rootStem) n.replace(rootStem);
+    return () => n.stop();
+  }, []);
+  useEffect(() => saveLocal('root', rootStem), [rootStem]);
 
   useEffect(() => session.subscribe(setSnap), [session]);
 
@@ -42,7 +54,21 @@ export function App({ session, updateReady, onUpdate, offlineReady }: Props) {
 
   if (!snap.ready) return null;
 
-  const selected = selectedId ? snap.graph.nodes.get(selectedId) : undefined;
+  const g = snap.graph;
+  const selected = selectedId ? g.nodes.get(selectedId) : undefined;
+  // An unknown stem (not pulled yet, or deleted) shows the top level without rewriting the hash.
+  const rootNode = rootStem ? g.nodes.get(g.byStem.get(rootStem) ?? '') : undefined;
+  const rootId = rootNode?.id ?? null;
+
+  // Every drill-in or breadcrumb step is a user action: it pushes a history entry (B9).
+  const go = (stem: Root) => {
+    nav.current.go(stem);
+    setRootStem(stem);
+  };
+  const open = (id: string) => {
+    const n = g.nodes.get(id);
+    if (n) go(n.stem);
+  };
 
   return (
     <>
@@ -96,34 +122,38 @@ export function App({ session, updateReady, onUpdate, offlineReady }: Props) {
       ) : view === 'settings' ? (
         <Settings session={session} snap={snap} onClose={() => setView('home')} />
       ) : (
-        <div class={`pl-body${selected ? ' with-inspector' : ''}`}>
-          {mode === 'bubble' ? (
-            <main class="pl-main pl-main-fill">
-              <BubbleView snap={snap} root={root} selectedId={selectedId} onSelect={setSelectedId} />
-            </main>
-          ) : (
-            <main class="pl-main pl-main-wide">
-              <ListView snap={snap} selectedId={selectedId} onSelect={setSelectedId} />
-            </main>
-          )}
-          {selected && (
-            <Inspector
-              key={selected.id}
-              session={session}
-              snap={snap}
-              node={selected}
-              onClose={() => setSelectedId(null)}
-              onSelect={setSelectedId}
-              onReview={() => setResolving(true)}
-            />
-          )}
-        </div>
+        <>
+          <Breadcrumb g={g} root={rootNode ?? null} onGo={go} />
+          <div class={`pl-body${selected ? ' with-inspector' : ''}`}>
+            {mode === 'bubble' ? (
+              <main class="pl-main pl-main-fill">
+                <BubbleView snap={snap} root={rootId} selectedId={selectedId} onSelect={setSelectedId} onOpen={open} />
+              </main>
+            ) : (
+              <main class="pl-main pl-main-wide">
+                <ListView snap={snap} root={rootId} selectedId={selectedId} onSelect={setSelectedId} onOpen={open} />
+              </main>
+            )}
+            {selected && (
+              <Inspector
+                key={selected.id}
+                session={session}
+                snap={snap}
+                node={selected}
+                onClose={() => setSelectedId(null)}
+                onSelect={setSelectedId}
+                onReview={() => setResolving(true)}
+                onOpen={open}
+              />
+            )}
+          </div>
+        </>
       )}
       {adding && (
         <QuickAdd
           session={session}
           snap={snap}
-          defaultParent={selected?.stem ?? null}
+          defaultParent={selected?.stem ?? rootNode?.stem ?? null}
           onDone={(id) => {
             setAdding(false);
             if (id) setSelectedId(id);
