@@ -109,8 +109,9 @@ export function replay(base: ReadonlyMap<string, string>, queue: readonly Queued
 
     for (const q of batch) {
       const op = renameLinks(q.op, res.renamed);
-      const c = (field: Conflict['field'], baseV: unknown, theirs: unknown, mine: unknown) => {
-        res.conflicts.set(q.opId, { opId: q.opId, nodeId: 'nodeId' in op ? op.nodeId : '', field, base: baseV, mine, theirs });
+      const c = (field: Conflict['field'], baseV: unknown, theirs: unknown, mine: unknown, readOnly = false) => {
+        const nodeId = 'nodeId' in op ? op.nodeId : '';
+        res.conflicts.set(q.opId, { opId: q.opId, nodeId, field, base: baseV, mine, theirs, ...(readOnly ? { readOnly } : {}) });
         conflict = true;
       };
 
@@ -121,7 +122,7 @@ export function replay(base: ReadonlyMap<string, string>, queue: readonly Queued
           continue;
         }
         if (found.node.readOnly) {
-          c(op.kind === 'set' ? op.field : 'body', op.from, 'read-only (conflict markers or unparseable)', op.to);
+          c(op.kind === 'set' ? op.field : 'body', op.from, null, op.to, true);
           continue;
         }
         const current = op.kind === 'set' ? fieldValue(found.node, op.field) : found.node.body;
@@ -242,6 +243,33 @@ export function checkOp(g: Graph, op: Op): string | null {
   }
   if (op.kind === 'createPerson') return op.person.name.trim() ? null : 'The name cannot be empty.';
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Conflict resolution (blueprint §8.4). The dialog offers yours / theirs /
+// base; nothing is chosen automatically.
+
+export type Resolution = 'mine' | 'theirs' | 'base';
+
+/**
+ * Turn a decision into queue changes. "Theirs" drops my op: the repo already
+ * holds their value, and the held ops of the batch replay on their own.
+ * "Mine" and "base" become a fresh op whose `from` is their value, so it
+ * applies cleanly at the next rebase (and conflicts again only if the field
+ * moves yet again in the meantime). Null means: nothing to queue, drop the op.
+ * Returns undefined when the op cannot be resolved that way (a remotely
+ * deleted or read-only note accepts only "theirs").
+ */
+export function resolveConflict(q: QueuedOp, choice: Resolution): QueuedOp | null | undefined {
+  const c = q.conflict;
+  if (!c) return undefined;
+  if (choice === 'theirs') return null;
+  if (c.field === 'deleted' || c.readOnly || !(q.op.kind === 'set' || q.op.kind === 'body')) return undefined;
+  const to = choice === 'mine' ? c.mine : c.base;
+  if (sameValue(to, c.theirs)) return null; // nothing to change
+  const { conflict: _c, ...rest } = q;
+  const op: Op = q.op.kind === 'body' ? { kind: 'body', nodeId: q.op.nodeId, from: String(c.theirs ?? ''), to: String(to ?? '') } : { ...q.op, from: c.theirs, to };
+  return { ...rest, op };
 }
 
 /** Commit message for the batches in a push (blueprint §8.3). */

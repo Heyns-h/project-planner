@@ -2,7 +2,7 @@ import { monotonicFactory } from 'ulid';
 import { stemOf } from '../core/classify';
 import { detectDomains } from '../core/domains';
 import { buildGraph, nodeByStem } from '../core/graph';
-import { checkOp, fieldValue, replay, sameValue } from '../core/ops';
+import { checkOp, fieldValue, replay, resolveConflict, sameValue, type Resolution } from '../core/ops';
 import { computeRollups, type Rollup } from '../core/rollup';
 import { peopleFolder, plannerFolder } from '../core/serialize';
 import { uniqueStem } from '../core/slug';
@@ -291,6 +291,29 @@ export class Session {
     const stem = uniqueStem(name, this.takenStems());
     const error = await this.act(`add person '${name.trim()}'`, [{ kind: 'createPerson', person: { name, domain }, path: `${peopleFolder(def.folder)}/${stem}.md` }]);
     return error ? { error } : { error: null, stem };
+  }
+
+  /**
+   * Conflict dialog (blueprint §8.4): keep mine, take theirs, or go back to the
+   * value both started from. Returns an error message, or null when done.
+   */
+  async resolve(opId: string, choice: Resolution): Promise<string | null> {
+    const store = this.store;
+    if (!store) return 'Not connected.';
+    const q = (await store.queued()).find((x) => x.opId === opId);
+    if (!q?.conflict) return null; // already gone, e.g. the field moved again and a re-sync cleared it
+    const r = resolveConflict(q, choice);
+    if (r === undefined) return 'This change can only be discarded.';
+    if (r) {
+      const err = checkOp(this.snap.graph, r.op);
+      if (err) return err;
+      await store.updateQueue([r], []);
+    } else {
+      await store.updateQueue([], [opId]);
+    }
+    await this.rebuild();
+    this.scheduleSync();
+    return null;
   }
 
   async forget(): Promise<void> {

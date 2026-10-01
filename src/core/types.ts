@@ -157,6 +157,8 @@ export interface Conflict {
   base: unknown;
   mine: unknown;
   theirs: unknown;
+  /** The note has conflict markers or broken frontmatter: only "theirs" (drop) can resolve it. */
+  readOnly?: boolean;
 }
 
 export type SyncState =

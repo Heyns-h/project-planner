@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { Session, Snapshot } from '../app/session';
 import { startTriggers } from '../sync/triggers';
+import { ConflictDialog } from './ConflictDialog';
 import { Inspector } from './Inspector';
 import { ListView } from './ListView';
 import { QuickAdd } from './QuickAdd';
@@ -20,6 +21,7 @@ export function App({ session, updateReady, onUpdate, offlineReady }: Props) {
   const [view, setView] = useState<'home' | 'settings'>('home');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => session.subscribe(setSnap), [session]);
 
@@ -40,6 +42,16 @@ export function App({ session, updateReady, onUpdate, offlineReady }: Props) {
           <span>A new version is ready.</span>
           <button class="pl-button primary" onClick={onUpdate}>
             Reload
+          </button>
+        </div>
+      )}
+      {connected && snap.conflicts.length > 0 && !resolving && (
+        <div class="pl-banner" role="status">
+          <span>
+            {snap.conflicts.length} change{snap.conflicts.length === 1 ? '' : 's'} need{snap.conflicts.length === 1 ? 's' : ''} a decision before syncing.
+          </span>
+          <button class="pl-button primary" onClick={() => setResolving(true)}>
+            Review
           </button>
         </div>
       )}
@@ -71,7 +83,15 @@ export function App({ session, updateReady, onUpdate, offlineReady }: Props) {
             <ListView snap={snap} selectedId={selectedId} onSelect={setSelectedId} />
           </main>
           {selected && (
-            <Inspector key={selected.id} session={session} snap={snap} node={selected} onClose={() => setSelectedId(null)} onSelect={setSelectedId} />
+            <Inspector
+              key={selected.id}
+              session={session}
+              snap={snap}
+              node={selected}
+              onClose={() => setSelectedId(null)}
+              onSelect={setSelectedId}
+              onReview={() => setResolving(true)}
+            />
           )}
         </div>
       )}
@@ -86,6 +106,7 @@ export function App({ session, updateReady, onUpdate, offlineReady }: Props) {
           }}
         />
       )}
+      {resolving && <ConflictDialog session={session} snap={snap} onClose={() => setResolving(false)} />}
       <StatusBar snap={snap} offlineReady={offlineReady} />
     </>
   );

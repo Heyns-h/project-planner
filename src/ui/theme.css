@@ -175,6 +175,16 @@ html, body {
 
 .pl-modal-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.55); display: grid; place-items: center; padding: 16px; z-index: 20; }
 .pl-modal { width: min(480px, 100%); margin: 0; max-height: 90dvh; overflow-y: auto; }
+.pl-modal-wide { width: min(680px, 100%); }
+.pl-conflict { border-top: 1px solid var(--pl-border); padding-top: 12px; }
+.pl-conflict h3 { margin: 0 0 4px; font-size: 16px; }
+.pl-conflict .pl-small { margin: 0 0 10px; }
+.pl-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pl-choice { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--pl-border); border-radius: var(--pl-radius); background: var(--pl-bg); }
+.pl-choice .pl-button { margin-top: auto; }
+.pl-conflict-value { overflow-wrap: anywhere; }
+.pl-conflict-pre { margin: 0; max-height: 160px; overflow: auto; white-space: pre-wrap; font-size: 13px; font-family: inherit; }
+@media (max-width: 599px) { .pl-choices { grid-template-columns: 1fr; } }
 .pl-segmented { display: flex; border: 1px solid var(--pl-border); border-radius: var(--pl-radius); overflow: hidden; }
 .pl-segmented button { flex: 1; min-height: var(--pl-touch); border: 0; background: var(--pl-bg); color: var(--pl-text); font: inherit; cursor: pointer; }
 .pl-segmented button.on { background: var(--pl-accent); color: #1c1714; font-weight: 600; }

@@ -16,6 +16,7 @@ interface Props {
   node: PlannerNode;
   onClose: () => void;
   onSelect: (id: string) => void;
+  onReview: () => void; // open the conflict dialog
 }
 
 function TextField({ label, value, onSave, multiline, disabled }: { label: string; value: string; onSave: (v: string) => void; multiline?: boolean; disabled?: boolean }) {
@@ -45,11 +46,12 @@ function TextField({ label, value, onSave, multiline, disabled }: { label: strin
   );
 }
 
-export function Inspector({ session, snap, node: n, onClose, onSelect }: Props) {
+export function Inspector({ session, snap, node: n, onClose, onSelect, onReview }: Props) {
   const g = snap.graph;
   const [error, setError] = useState<string | null>(null);
   const ro = n.readOnly;
   const cfg = snap.config;
+  const conflicted = snap.conflicts.filter((q) => q.conflict?.nodeId === n.id).length;
 
   useEffect(() => setError(null), [n.id]);
 
@@ -92,6 +94,14 @@ export function Inspector({ session, snap, node: n, onClose, onSelect }: Props) 
       {error && (
         <p class="pl-error" role="alert">
           {error}
+        </p>
+      )}
+      {conflicted > 0 && (
+        <p class="pl-warn pl-small">
+          {conflicted === 1 ? 'A change to this item needs' : `${conflicted} changes to this item need`} a decision.{' '}
+          <button type="button" class="pl-link-button" onClick={onReview}>
+            Review
+          </button>
         </p>
       )}
       {n.problems.length > 0 && (

@@ -1,9 +1,55 @@
-import { statusLabel } from '../core/status';
-import type { PlannerType, Priority, StoredStatus } from '../core/types';
+import { isStoredStatus, statusLabel } from '../core/status';
+import type { Field, Graph, PlannerType, Priority, StoredStatus } from '../core/types';
 
 export const TYPE_LABEL: Record<PlannerType, string> = { project: 'Project', subproject: 'Sub-project', task: 'Task' };
 export const PRIORITY_LABEL: Record<Priority, string> = { low: 'Low', medium: 'Medium', high: 'High' };
 export { statusLabel };
+
+export const FIELD_LABEL: Record<Field | 'body' | 'deleted', string> = {
+  title: 'Title',
+  status: 'Status',
+  parent: 'Parent',
+  priority: 'Priority',
+  owner: 'Owner',
+  people: 'People',
+  tags: 'Tags',
+  start: 'Start',
+  due: 'Due',
+  blockedBy: 'Blocked by',
+  relates: 'Relates to',
+  references: 'References',
+  drive: 'Drive links',
+  body: 'Notes',
+  deleted: 'Item',
+};
+
+/** A field value as the user would see it in the Inspector: labels and titles, not stored tokens. */
+export function formatValue(field: Field | 'body' | 'deleted', v: unknown, g: Graph): string {
+  if (v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)) return '(empty)';
+  const name = (s: unknown) => {
+    const stem = String(s);
+    return g.nodes.get(g.byStem.get(stem) ?? '')?.title ?? g.people.get(stem)?.name ?? stem;
+  };
+  switch (field) {
+    case 'status':
+      return isStoredStatus(v) ? statusLabel(v) : String(v);
+    case 'priority':
+      return PRIORITY_LABEL[v as Priority] ?? String(v);
+    case 'parent':
+    case 'owner':
+      return name(v);
+    case 'people':
+    case 'blockedBy':
+    case 'relates':
+    case 'references':
+      return Array.isArray(v) ? v.map(name).join(', ') : name(v);
+    case 'tags':
+    case 'drive':
+      return Array.isArray(v) ? v.map(String).join(', ') : String(v);
+    default:
+      return String(v);
+  }
+}
 
 export const STATUS_CLASS: Record<StoredStatus, string> = {
   idea: 'st-idea',

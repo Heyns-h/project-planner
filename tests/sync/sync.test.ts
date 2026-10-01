@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { replay } from '../../src/core/ops';
+import { replay, resolveConflict } from '../../src/core/ops';
 import type { Field, NewNode, Op, QueuedOp } from '../../src/core/types';
 import { Store } from '../../src/store/db';
 import { sync } from '../../src/sync/engine';
@@ -212,6 +212,40 @@ describe('conflicts and batches', () => {
     await laptop.store.updateQueue([resolved], []);
     await laptop.sync();
     expect(line(QUOTE, 'status')).toBe('status: on-hold');
+  });
+
+  it('resolving as "theirs" drops the op and releases the held rest of its batch', async () => {
+    const laptop = await device('laptop');
+    await laptop.sync();
+    await fake.commitChange({ [QUOTE]: fake.snapshot()[QUOTE]!.replace('status: active', 'status: done') });
+    await laptop.enqueue([
+      { kind: 'set', nodeId: 'N7', field: 'status', from: 'active', to: 'on-hold' },
+      { kind: 'set', nodeId: 'N7', field: 'priority', from: 'medium', to: 'high' },
+    ]);
+    await laptop.sync();
+    const [c] = await laptop.store.queued();
+    expect(resolveConflict(c!, 'theirs')).toBeNull();
+    await laptop.store.updateQueue([], [c!.opId]);
+    const r = await laptop.sync();
+    expect(r.pushed?.ops).toBe(1);
+    expect(line(QUOTE, 'status')).toBe('status: done');
+    expect(line(QUOTE, 'priority')).toBe('priority: high');
+    expect(await laptop.store.queued()).toEqual([]);
+  });
+
+  it('resolving as "base" restores the value both devices started from', async () => {
+    const laptop = await device('laptop');
+    await laptop.sync();
+    await fake.commitChange({ [QUOTE]: fake.snapshot()[QUOTE]!.replace('status: active', 'status: done') });
+    await laptop.set('N7', 'status', 'active', 'on-hold');
+    await laptop.sync();
+    const [c] = await laptop.store.queued();
+    const resolved = resolveConflict(c!, 'base');
+    expect(resolved?.op).toMatchObject({ from: 'done', to: 'active' });
+    await laptop.store.updateQueue([resolved!], []);
+    await laptop.sync();
+    expect(line(QUOTE, 'status')).toBe('status: active');
+    expect(await laptop.store.queued()).toEqual([]);
   });
 
   it('drops ops that are already reflected in the repo', async () => {
