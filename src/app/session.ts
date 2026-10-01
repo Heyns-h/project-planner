@@ -5,7 +5,7 @@ import { buildGraph, nodeByStem } from '../core/graph';
 import { checkOp, fieldValue, replay, resolveConflict, sameValue, type Resolution } from '../core/ops';
 import { computeRollups, type Rollup } from '../core/rollup';
 import { peopleFolder, plannerFolder } from '../core/serialize';
-import { uniqueStem } from '../core/slug';
+import { slugify, uniqueStem } from '../core/slug';
 import type { Domain, DomainDef, Field, Graph, NewNode, Op, QueuedOp, RepoConfig, Stem } from '../core/types';
 import { Store } from '../store/db';
 import { sync } from '../sync/engine';
@@ -235,7 +235,7 @@ export class Session {
     const config = this.snap.config;
     if (!store || !config) return 'Not connected.';
     for (const op of ops) {
-      const err = checkOp(this.snap.graph, op);
+      const err = checkOp(this.snap.graph, op, ops);
       if (err) return err;
     }
     const batchId = newId();
@@ -283,6 +283,24 @@ export class Session {
     const node: NewNode = { ...input, id, domain };
     const error = await this.act(`add '${input.title.trim()}'`, [{ kind: 'create', node, path: `${plannerFolder(def.folder)}/${stem}.md` }]);
     return error ? { error } : { error: null, id };
+  }
+
+  /**
+   * Add a tag to a domain's vocabulary table and apply it to a node, as one
+   * batch, so the row and the edit land in the same commit (vault guide:
+   * add a new tag to the list "in the same edit"). Returns the tag as written.
+   */
+  async addTag(nodeId: string, name: string, meaning: string): Promise<{ error: string | null; tag?: string }> {
+    const n = this.snap.graph.nodes.get(nodeId);
+    if (!n) return { error: 'That item no longer exists.' };
+    const tag = slugify(name);
+    if (!tag) return { error: 'The tag needs a name.' };
+    const tags = n.tags.includes(tag) ? n.tags : [...n.tags, tag];
+    const error = await this.act(`add tag '${tag}' to ${n.domain}; edit '${n.title}' (tags)`, [
+      { kind: 'addTag', domain: n.domain, tag, meaning: meaning.trim() },
+      { kind: 'set', nodeId, field: 'tags', from: n.tags, to: tags },
+    ]);
+    return error ? { error } : { error: null, tag };
   }
 
   async createPerson(name: string, domain: Domain): Promise<{ error: string | null; stem?: Stem }> {

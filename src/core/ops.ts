@@ -196,7 +196,11 @@ export function replay(base: ReadonlyMap<string, string>, queue: readonly Queued
 // ---------------------------------------------------------------------------
 // Checks before an op is queued (plan §6: an invalid op is refused up front).
 
-export function checkOp(g: Graph, op: Op): string | null {
+/**
+ * `batch` is the rest of the action: a `set tags` may use a tag that an
+ * `addTag` in the same batch adds to the domain's list.
+ */
+export function checkOp(g: Graph, op: Op, batch: readonly Op[] = []): string | null {
   if (op.kind === 'set' || op.kind === 'body') {
     const n = g.nodes.get(op.nodeId);
     if (!n) return 'That item no longer exists.';
@@ -221,8 +225,9 @@ export function checkOp(g: Graph, op: Op): string | null {
       case 'references':
         return (v as unknown[]).every(resolves) ? null : 'Every link must be a note in the repo.';
       case 'tags': {
-        const allowed = g.tags.get(n.domain)?.tags ?? [];
-        const bad = (v as string[]).filter((t) => !allowed.includes(t));
+        const allowed = new Set(g.tags.get(n.domain)?.tags ?? []);
+        for (const o of batch) if (o.kind === 'addTag' && o.domain === n.domain) allowed.add(o.tag);
+        const bad = (v as string[]).filter((t) => !allowed.has(t));
         return bad.length ? `Not in the ${n.domain} tag list: ${bad.join(', ')}` : null;
       }
       case 'start':
@@ -242,6 +247,12 @@ export function checkOp(g: Graph, op: Op): string | null {
     return null;
   }
   if (op.kind === 'createPerson') return op.person.name.trim() ? null : 'The name cannot be empty.';
+  if (op.kind === 'addTag') {
+    if (!g.tags.has(op.domain)) return `The ${op.domain} domain has no tag list to add to.`;
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(op.tag)) return 'A tag is lower-case words joined by hyphens.';
+    if (g.tags.get(op.domain)?.tags.includes(op.tag)) return `"${op.tag}" is already in the ${op.domain} tag list.`;
+    return op.meaning.trim() ? null : 'Say what the tag means.';
+  }
   return null;
 }
 

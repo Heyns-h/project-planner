@@ -5,6 +5,7 @@ import type { Field, PlannerNode, Priority, StoredStatus } from '../core/types';
 import { STATUSES } from '../core/status';
 import { safeUrl, TYPE_LABEL } from './format';
 import { Picker, type Option } from './Picker';
+import { TagDialog } from './TagDialog';
 
 // Blueprint §6: edit every property. Side panel on wide screens, bottom sheet
 // on narrow ones (CSS). Text fields save on blur or Enter; selects, dates and
@@ -82,6 +83,7 @@ export function Inspector({ session, snap, node: n, onClose, onSelect, onReview,
   const rollup = snap.rollups.get(n.id);
   const githubUrl = cfg ? `https://github.com/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/blob/${encodeURIComponent(cfg.branch)}/${n.path.split('/').map(encodeURIComponent).join('/')}` : null;
   const [newDrive, setNewDrive] = useState('');
+  const [newTag, setNewTag] = useState<string | null>(null);
 
   return (
     <aside class="pl-inspector" aria-label={`Edit ${n.title}`}>
@@ -181,7 +183,17 @@ export function Inspector({ session, snap, node: n, onClose, onSelect, onReview,
         createLabel="Add person"
         placeholder="Search people…"
       />
-      <Picker label={`Tags (${n.domain} list)`} multi disabled={ro} options={tagOptions} selected={n.tags} onChange={(v) => void save('tags', v)} placeholder={tagOptions.length ? 'Search tags…' : 'This domain has no tags yet'} />
+      <Picker
+        label={`Tags (${n.domain} list)`}
+        multi
+        disabled={ro}
+        options={tagOptions}
+        selected={n.tags}
+        onChange={(v) => void save('tags', v)}
+        placeholder={tagOptions.length ? 'Search or add tags…' : 'No tags in this domain yet — type to add one'}
+        {...(g.tags.has(n.domain) ? { onCreate: (name: string) => setNewTag(name), createLabel: 'Add tag' } : {})}
+      />
+      {newTag !== null && <TagDialog session={session} nodeId={n.id} domain={n.domain} initialName={newTag} onDone={() => setNewTag(null)} />}
       <Picker label="Blocked by" multi disabled={ro} options={blockerOptions} selected={n.blockedBy} onChange={(v) => void save('blockedBy', v)} placeholder="Search items…" />
       {(g.blocks.get(n.id) ?? []).length > 0 && (
         <p class="pl-muted">

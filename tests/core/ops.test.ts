@@ -1,6 +1,48 @@
 import { describe, expect, it } from 'vitest';
-import { resolveConflict } from '../../src/core/ops';
-import type { Conflict, QueuedOp } from '../../src/core/types';
+import { buildGraph } from '../../src/core/graph';
+import { checkOp, replay, resolveConflict } from '../../src/core/ops';
+import type { Conflict, Op, QueuedOp } from '../../src/core/types';
+import { DOMAINS, FILES, indexPaths, repoFiles } from '../fixtures/repo';
+
+const TAGS = '01-Alpha/_alpha-tags.md';
+const GANGERS = '01-Alpha/07-planner/paint-gangers.md';
+
+describe('addTag with the edit that uses it (plan Phase 2 §5)', () => {
+  const g = buildGraph(repoFiles(), indexPaths(), DOMAINS);
+  const batch: Op[] = [
+    { kind: 'addTag', domain: 'alpha', tag: 'rush', meaning: 'Needed this week' },
+    { kind: 'set', nodeId: 'N3', field: 'tags', from: ['painting'], to: ['painting', 'rush'] },
+  ];
+
+  it('is accepted up front only as a batch: the tag is not in the list yet', () => {
+    expect(checkOp(g, batch[1]!)).toMatch(/Not in the alpha tag list: rush/);
+    expect(checkOp(g, batch[1]!, batch)).toBeNull();
+    expect(checkOp(g, batch[0]!)).toBeNull();
+    expect(checkOp(g, { kind: 'addTag', domain: 'alpha', tag: 'painting', meaning: 'x' })).toMatch(/already/);
+    expect(checkOp(g, { kind: 'addTag', domain: 'alpha', tag: 'Not Kebab', meaning: 'x' })).toMatch(/lower-case/);
+    expect(checkOp(g, { kind: 'addTag', domain: 'beta', tag: 'rush', meaning: 'x' })).toMatch(/no tag list/);
+  });
+
+  it('replays as one row in the table plus the note edit, and holds both on a conflict', () => {
+    const q = (ops: Op[], batchId = 'b'): QueuedOp[] => ops.map((op, i) => ({ opId: `${batchId}-${i}`, batchId, summary: 's', op, at: '', device: 'd', seq: i + 1 }));
+    const ctx = { domains: DOMAINS, allStems: new Set<string>(), today: '2026-10-01' };
+    const r = replay(new Map(Object.entries(FILES)), q(batch), ctx);
+    expect(r.applied).toEqual(['b-0', 'b-1']);
+    const table = r.files.get(TAGS)!;
+    expect(table.split('\n').filter((l) => l.startsWith('|'))).toHaveLength(2 + 3); // header, divider, two seeded, one new
+    expect(table).toContain('| `rush` | Needed this week | 2026-10-01 |');
+    expect(r.files.get(GANGERS)).toContain('tags: [painting, rush]');
+
+    // The note moved under us: the tag row must not land on its own.
+    const moved = new Map(Object.entries(FILES));
+    moved.set(GANGERS, FILES[GANGERS]!.replace('tags: [painting]', 'tags: [terrain]'));
+    const held = replay(moved, q(batch), ctx);
+    expect(held.applied).toEqual([]);
+    expect(held.conflicts.has('b-1')).toBe(true);
+    expect(held.held).toEqual(['b-0']);
+    expect(held.files.get(TAGS)).toBe(FILES[TAGS]);
+  });
+});
 
 // Conflict resolution is pure: a decision becomes a queue change.
 

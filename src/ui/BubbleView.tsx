@@ -45,10 +45,11 @@ function useSize(ref: { current: HTMLElement | null }): { w: number; h: number }
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      if (!entry) return;
-      const { width, height } = entry.contentRect;
+    const apply = (width: number, height: number) =>
       setSize((s) => (s.w === Math.round(width) && s.h === Math.round(height) ? s : { w: Math.round(width), h: Math.round(height) }));
+    apply(el.clientWidth, el.clientHeight); // measure now; the observer only reports changes
+    const ro = new ResizeObserver(([entry]) => {
+      if (entry) apply(entry.contentRect.width, entry.contentRect.height);
     });
     ro.observe(el);
     return () => ro.disconnect();
