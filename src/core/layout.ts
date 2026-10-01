@@ -32,6 +32,21 @@ export interface LayoutNode {
   children: LayoutNode[];
 }
 
+export type LinkKind = 'blockedBy' | 'relates' | 'references';
+
+/**
+ * A typed link between two visible circles. A link from anything inside
+ * circle A to anything inside circle B is drawn once between A and B; links
+ * that stay inside one circle, or run between a circle and its own parent,
+ * are not drawn. `cross` marks a link between domains (dotted line).
+ */
+export interface LayoutLink {
+  from: LayoutNode;
+  to: LayoutNode;
+  kind: LinkKind;
+  cross: boolean;
+}
+
 export interface Layout {
   width: number;
   height: number;
@@ -39,6 +54,7 @@ export interface Layout {
   nodes: LayoutNode[];
   /** Every circle, level 1 then level 2, for flat rendering. */
   all: LayoutNode[];
+  links: LayoutLink[];
 }
 
 export interface LayoutOptions {
@@ -54,7 +70,7 @@ export interface LayoutOptions {
   floor?: number;
 }
 
-const DEFAULTS: Required<LayoutOptions> = { padding: 6, innerPadding: 34, floor: 0.6 };
+const DEFAULTS: Required<LayoutOptions> = { padding: 22, innerPadding: 34, floor: 0.6 };
 
 const isDone = (n: PlannerNode) => statusInfo(n.status).done;
 const counted = (n: PlannerNode) => n.plannerType === 'task' && statusInfo(n.status).inRollup;
@@ -81,7 +97,7 @@ export function layout(g: Graph, rollups: ReadonlyMap<string, Rollup>, rootId: s
   const level1 = (rootId === null ? roots(g) : childrenOf(g, rootId)).filter(shown);
   const root: Datum = { n: null, open: 0, children: level1.map((n) => datum(g, n, 1)) };
 
-  if (level1.length === 0) return { width, height, nodes: [], all: [] };
+  if (level1.length === 0) return { width, height, nodes: [], all: [], links: [] };
 
   const h = hierarchy<Datum>(root, (d) => d.children)
     // Leaves carry their own weight (with the floor); parents are sized by their children.
@@ -113,5 +129,44 @@ export function layout(g: Graph, rollups: ReadonlyMap<string, Rollup>, rootId: s
   };
 
   const nodes = (packed.children ?? []).map((c) => toNode(c, 1));
-  return { width, height, nodes, all: [...nodes, ...nodes.flatMap((n) => n.children)] };
+  const all = [...nodes, ...nodes.flatMap((n) => n.children)];
+  return { width, height, nodes, all, links: links(g, nodes) };
+}
+
+const LINK_FIELDS: readonly LinkKind[] = ['blockedBy', 'relates', 'references'];
+
+/** Typed links between visible circles (see LayoutLink). */
+function links(g: Graph, nodes: readonly LayoutNode[]): LayoutLink[] {
+  // Which visible circle each node falls under: a level-2 circle for itself
+  // and its descendants, otherwise the level-1 circle.
+  const owner = new Map<string, LayoutNode>();
+  const parentOf = new Map<LayoutNode, LayoutNode>();
+  for (const p of nodes) {
+    owner.set(p.node.id, p);
+    for (const d of descendants(g, p.node.id)) owner.set(d.id, p);
+    for (const c of p.children) {
+      parentOf.set(c, p);
+      owner.set(c.node.id, c);
+      for (const d of descendants(g, c.node.id)) owner.set(d.id, c);
+    }
+  }
+  const out: LayoutLink[] = [];
+  const seen = new Set<string>();
+  for (const [id, from] of owner) {
+    const n = g.nodes.get(id);
+    if (!n) continue;
+    for (const kind of LINK_FIELDS) {
+      for (const stem of n[kind]) {
+        const targetId = g.byStem.get(stem);
+        const to = targetId ? owner.get(targetId) : undefined;
+        if (!to || to === from) continue; // outside the view, or inside the same circle
+        if (parentOf.get(from) === to || parentOf.get(to) === from) continue; // a circle and its own parent
+        const key = `${from.node.id}>${to.node.id}:${kind}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ from, to, kind, cross: from.node.domain !== to.node.domain });
+      }
+    }
+  }
+  return out;
 }

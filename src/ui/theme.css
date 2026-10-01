@@ -183,28 +183,35 @@ html, body {
 .bb-node { cursor: pointer; }
 .bb-node:focus-visible { outline: none; }
 .bb-node:focus-visible .bb-fill { stroke: var(--pl-highlight); stroke-width: 3; }
+/* Fill follows the level: muted orange for projects down to muted brown for
+   tasks, one step darker when nested, so a circle never shares a tone with
+   the circle around it (decision 8). Status is the rim colour. */
 .bb-fill { stroke: var(--pl-border); stroke-width: 1.5; }
-.bb-d1 .bb-fill { fill: var(--pl-surface-2); }
-.bb-d1.st-active .bb-fill { fill: #6b4f22; }           /* progress, deepened for a filled area */
-.bb-d1.st-hold .bb-fill { fill: #5c2a1e; }
-.bb-d1.st-done .bb-fill { fill: #46502a; }
-.bb-d2 .bb-fill { fill: var(--pl-surface); }
-.bb-d2.st-idea .bb-fill { fill: #3a3028; }
-.bb-d2.st-active .bb-fill { fill: var(--pl-progress); }
-.bb-d2.st-hold .bb-fill { fill: var(--pl-blocked); }
-.bb-d2.st-done .bb-fill { fill: var(--pl-done); }
-.bb-dim .bb-fill { fill-opacity: 0.45; }                /* no open tasks: darker (decision 5) */
-.bb-blocked .bb-fill { stroke: var(--pl-blocked); stroke-width: 2.5; }
-.bb-selected .bb-fill { stroke: var(--pl-highlight); stroke-width: 3; }
-.bb-ring { stroke: var(--pl-progress); stroke-width: 3; stroke-linecap: butt; opacity: 0.9; }
-.bb-d2 .bb-ring { stroke: var(--pl-text); stroke-width: 2; opacity: 0.7; }
+.t-project .bb-fill { fill: #8f5a37; }
+.t-subproject .bb-fill { fill: #7a6040; }
+.t-task .bb-fill { fill: #5c4a3c; }
+.bb-d2.t-project .bb-fill { fill: #74482c; }
+.bb-d2.t-subproject .bb-fill { fill: #624c33; }
+.bb-d2.t-task .bb-fill { fill: #4a3b30; }
+.st-active .bb-fill { stroke: var(--pl-progress); stroke-width: 2; }
+.st-hold .bb-fill { stroke: var(--pl-blocked); stroke-width: 2; }
+.st-done .bb-fill { stroke: var(--pl-done); stroke-width: 2; }
+.bb-dim .bb-fill { fill-opacity: 0.5; }                 /* no open tasks: darker (decision 5) */
+.bb-blocked .bb-fill { stroke: var(--pl-blocked); stroke-width: 2.5; stroke-dasharray: 6 3; }
+.bb-selected .bb-fill { stroke: var(--pl-highlight); stroke-width: 3; stroke-dasharray: none; }
+.bb-ring { stroke: var(--pl-progress); stroke-width: 3; stroke-linecap: butt; opacity: 0.85; }
+.bb-d2 .bb-ring { stroke: var(--pl-highlight); stroke-width: 2; opacity: 0.7; }
 .bb-text { pointer-events: none; }
 .bb-label { fill: var(--pl-text); font-weight: 600; pointer-events: none; paint-order: stroke; stroke: var(--pl-bg); stroke-width: 3px; stroke-linejoin: round; }
 .bb-d2 .bb-label { stroke: none; } /* centred in its own circle: nothing to read through */
-.bb-d2.st-active .bb-label, .bb-d2.st-done .bb-label { fill: #1c1714; }
-.bb-d2.st-active .bb-beneath, .bb-d2.st-done .bb-beneath { fill: #1c1714; opacity: 0.8; }
 .bb-beneath { fill: var(--pl-muted); pointer-events: none; }
 .bb-dim .bb-label { fill: var(--pl-muted); }
+/* Typed links, rim to rim: solid within a domain, dotted across (decision 7). */
+.bb-link-halo { stroke: var(--pl-bg); stroke-width: 5; opacity: 0.7; }
+.bb-link-line { stroke: var(--pl-link); stroke-width: 2; }
+.bb-link.k-blockedBy .bb-link-line { stroke: var(--pl-blocked); }
+.bb-link.cross .bb-link-line { stroke-dasharray: 2 5; stroke-linecap: round; }
+.bb-link-end { fill: var(--pl-blocked); stroke: var(--pl-bg); stroke-width: 1.5; }
 .pl-viewtoggle { margin-right: auto; }
 .pl-viewtoggle button { padding: 0 14px; min-height: 36px; }
 @media (max-width: 480px) { .pl-viewtoggle button { padding: 0 10px; font-size: 14px; } }

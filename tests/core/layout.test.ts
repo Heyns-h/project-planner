@@ -85,6 +85,34 @@ describe('layout', () => {
     expect(node(atHive, 'N4').percent).toBe(100); // its parent rolls it up
   });
 
+  it('draws one line per typed link between visible circles, dotted across domains', () => {
+    const { g, rollups } = build();
+    const l = layout(g, rollups, null, 800, 600);
+    // Confirm quote (beta, inside Q4 sourcing) is blocked by Paint gangers (alpha, hidden inside Hive).
+    expect(l.links.map((k) => [k.from.node.id, k.to.node.id, k.kind, k.cross])).toEqual([['N7', 'N2', 'blockedBy', true]]);
+  });
+
+  it('keeps links inside one circle, to a note outside the view, or to its own parent off the canvas', () => {
+    const { g, rollups } = build({
+      [A + 'sibling.md']: nodeText({ id: 'N11', type: 'task', title: 'Sibling', domain: 'alpha', parent: 'hive', blockedBy: ['paint-gangers'] }), // inside Hive with its target
+      [A + 'top.md']: nodeText({ id: 'N12', type: 'task', title: 'Top task', domain: 'alpha', parent: 'campaign', references: ['hive'] }), // a child linking its own parent-level sibling
+    });
+    const lines = (l: ReturnType<typeof layout>) => l.links.map((k) => [k.from.node.id, k.to.node.id, k.kind, k.cross]).sort();
+    // Top level: Sibling → Paint gangers stays inside Hive (not drawn); Top task → Hive are two level-2
+    // circles under Campaign (drawn, same domain); Confirm quote → Hive crosses domains (dotted).
+    expect(lines(layout(g, rollups, null, 800, 600))).toEqual([
+      ['N12', 'N2', 'references', false],
+      ['N7', 'N2', 'blockedBy', true],
+    ]);
+    // Drilled into Campaign: Hive's children are now visible, so the sibling link appears; Confirm quote is out of view.
+    expect(lines(layout(g, rollups, 'N1', 800, 600))).toEqual([
+      ['N11', 'N3', 'blockedBy', false],
+      ['N12', 'N2', 'references', false],
+    ]);
+    // Drilled into Hive: Paint gangers is level 1 and Sibling too; a link to its own parent circle is not drawn.
+    expect(lines(layout(g, rollups, 'N2', 800, 600))).toEqual([['N11', 'N3', 'blockedBy', false]]);
+  });
+
   it('returns nothing for a root without children', () => {
     const { g, rollups } = build();
     const l = layout(g, rollups, 'N7', 800, 600);

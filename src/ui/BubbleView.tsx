@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Snapshot } from '../app/session';
-import { layout, type LayoutNode } from '../core/layout';
+import { layout, type LayoutLink, type LayoutNode } from '../core/layout';
 import { STATUS_CLASS, TYPE_LABEL } from './format';
 
 // Blueprint §5.1: nested circles, sized by open tasks, coloured by status,
@@ -68,6 +68,28 @@ function Label({ n }: { n: LayoutNode }) {
   );
 }
 
+/** A typed link, drawn rim to rim; dotted when it crosses domains (decision 7). */
+function Link({ link }: { link: LayoutLink }) {
+  const { from, to } = link;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const d = Math.hypot(dx, dy);
+  if (d <= from.r + to.r) return null; // overlapping or nested: nothing sensible to draw
+  const ux = dx / d;
+  const uy = dy / d;
+  const x1 = from.x + ux * from.r;
+  const y1 = from.y + uy * from.r;
+  const x2 = to.x - ux * to.r;
+  const y2 = to.y - uy * to.r;
+  return (
+    <g class={`bb-link k-${link.kind}${link.cross ? ' cross' : ''}`}>
+      <line class="bb-link-halo" x1={x1} y1={y1} x2={x2} y2={y2} />
+      <line class="bb-link-line" x1={x1} y1={y1} x2={x2} y2={y2} />
+      {link.kind === 'blockedBy' && <circle class="bb-link-end" cx={x2} cy={y2} r={3.5} />}
+    </g>
+  );
+}
+
 function Circle({ n, selected, onSelect }: { n: LayoutNode; selected: boolean; onSelect: (id: string) => void }) {
   // The ring hugs the rim so the title band stays clear.
   const ringR = Math.max(0, n.r - (n.depth === 1 ? 3.5 : Math.max(2, n.r * 0.06)));
@@ -76,7 +98,7 @@ function Circle({ n, selected, onSelect }: { n: LayoutNode; selected: boolean; o
   return (
     <g
       data-node={n.node.id}
-      class={`bb-node bb-d${n.depth} ${STATUS_CLASS[n.node.status]}${n.dim ? ' bb-dim' : ''}${n.blocked ? ' bb-blocked' : ''}${selected ? ' bb-selected' : ''}`}
+      class={`bb-node bb-d${n.depth} t-${n.node.plannerType} ${STATUS_CLASS[n.node.status]}${n.dim ? ' bb-dim' : ''}${n.blocked ? ' bb-blocked' : ''}${selected ? ' bb-selected' : ''}`}
       transform={`translate(${n.x},${n.y})`}
       role="button"
       tabIndex={0}
@@ -115,18 +137,26 @@ export function BubbleView({ snap, root, selectedId, onSelect }: Props) {
       {lay && lay.nodes.length > 0 && (
         <svg class="bb-svg" viewBox={`0 0 ${w} ${h}`} width={w} height={h} role="group" aria-label="Projects as bubbles" onClick={() => onSelect(null)}>
           <g class="pl-world">
-            {lay.nodes.map((n) => (
-              <g key={n.node.id} class="bb-group">
-                <Circle n={n} selected={selectedId === n.node.id} onSelect={onSelect} />
-                {n.children.map((c) => (
-                  <Circle key={c.node.id} n={c} selected={selectedId === c.node.id} onSelect={onSelect} />
-                ))}
-                {n.children.map((c) => (
-                  <Label key={c.node.id} n={c} />
-                ))}
-                <Label n={n} />
-              </g>
-            ))}
+            <g class="bb-circles">
+              {lay.nodes.map((n) => (
+                <g key={n.node.id} class="bb-group">
+                  <Circle n={n} selected={selectedId === n.node.id} onSelect={onSelect} />
+                  {n.children.map((c) => (
+                    <Circle key={c.node.id} n={c} selected={selectedId === c.node.id} onSelect={onSelect} />
+                  ))}
+                </g>
+              ))}
+            </g>
+            <g class="bb-links" aria-hidden="true">
+              {lay.links.map((k) => (
+                <Link key={`${k.from.node.id}>${k.to.node.id}:${k.kind}`} link={k} />
+              ))}
+            </g>
+            <g class="bb-labels">
+              {lay.all.map((n) => (
+                <Label key={n.node.id} n={n} />
+              ))}
+            </g>
           </g>
         </svg>
       )}
