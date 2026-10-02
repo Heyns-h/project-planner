@@ -1,5 +1,5 @@
 import { hierarchy, pack, type HierarchyCircularNode } from 'd3-hierarchy';
-import { childrenOf, descendants, roots } from './graph';
+import { childrenOf, descendants, nodeByStem, roots } from './graph';
 import type { Rollup } from './rollup';
 import { statusInfo } from './status';
 import type { Graph, PlannerNode } from './types';
@@ -28,14 +28,30 @@ export interface LayoutNode {
   partial: boolean;
   /** No open tasks: floor size and a darker shade. */
   dim: boolean;
-  /** What is inside (decision 12): items one level down, Drive links in the subtree, due pressure. */
+  /** What is inside (decision 12): items one level down, Drive links in the subtree. */
   children: number;
   attachments: number;
-  /** Open items (itself or beneath) with under 25 % of their start→due span left. */
-  dueSoon: number;
-  /** Of those, under 10 % left, or already overdue. */
-  dueCritical: number;
+  /** The ring (decision 15): every task beneath, in exactly one state. Null when there are none. */
+  ring: Ring | null;
 }
+
+/**
+ * Tasks beneath a node by state, for the segmented ring. A task is counted
+ * once, by the most pressing state: due (under 10 % of its start→due span
+ * left, or overdue), near due (under 25 %), blocked (on hold or waiting,
+ * itself or through a parent below the node), open, done.
+ */
+export interface Ring {
+  due: number;
+  near: number;
+  blocked: number;
+  open: number;
+  done: number;
+  total: number;
+}
+
+export const RING_STATES = ['due', 'near', 'blocked', 'open', 'done'] as const;
+export type RingState = (typeof RING_STATES)[number];
 
 export type LinkKind = 'blockedBy' | 'relates' | 'references';
 
@@ -104,6 +120,31 @@ interface Datum {
   open: number;
 }
 
+/** Which ring state a task is in, seen from `top` (decision 15). */
+export function ringState(g: Graph, t: PlannerNode, topId: string, today: string): RingState {
+  if (isDone(t)) return 'done';
+  const left = timeLeftPercent(t, today);
+  if (left !== null && left < 10) return 'due';
+  if (left !== null && left < 25) return 'near';
+  // Blocked by itself, or by any parent between it and the node whose ring this is.
+  const seen = new Set<string>();
+  let cur: PlannerNode | undefined = t;
+  while (cur && cur.id !== topId && !seen.has(cur.id)) {
+    if (cur.status === 'on-hold' || cur.blockedBy.some((s) => { const b = nodeByStem(g, s); return b !== undefined && !closed(b); })) return 'blocked';
+    seen.add(cur.id);
+    cur = cur.parent ? nodeByStem(g, cur.parent) : undefined;
+  }
+  return 'open';
+}
+
+function ringOf(g: Graph, n: PlannerNode, desc: readonly PlannerNode[], today: string): Ring | null {
+  const tasks = desc.filter(counted);
+  if (tasks.length === 0) return null;
+  const ring: Ring = { due: 0, near: 0, blocked: 0, open: 0, done: 0, total: tasks.length };
+  for (const t of tasks) ring[ringState(g, t, n.id, today)]++;
+  return ring;
+}
+
 export function layout(g: Graph, rollups: ReadonlyMap<string, Rollup>, rootId: string | null, width: number, height: number, today: string, options: LayoutOptions = {}): Layout {
   const { spread, floor } = { ...DEFAULTS, ...options };
   // The gap shrinks with the box, so a phone-width view is not all gap.
@@ -134,8 +175,6 @@ export function layout(g: Graph, rollups: ReadonlyMap<string, Rollup>, rootId: s
     const r = rollups.get(n.id);
     const desc = descendants(g, n.id);
     const subtree = [n, ...desc];
-    const openItems = subtree.filter((t) => !closed(t));
-    const left = openItems.map((t) => timeLeftPercent(t, today)).filter((v): v is number => v !== null);
     return {
       node: n,
       x: cx + (p.x - sx) * spread,
@@ -149,8 +188,7 @@ export function layout(g: Graph, rollups: ReadonlyMap<string, Rollup>, rootId: s
       dim: p.data.open === 0,
       children: childrenOf(g, n.id).filter(shown).length,
       attachments: subtree.reduce((sum, t) => sum + t.drive.length, 0),
-      dueSoon: left.filter((v) => v < 25).length,
-      dueCritical: left.filter((v) => v < 10).length,
+      ring: ringOf(g, n, desc, today),
     };
   };
 

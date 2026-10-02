@@ -197,8 +197,6 @@ html, body {
 .bb-dim .bb-fill { fill-opacity: 0.5; }                 /* no open tasks: darker (decision 5) */
 .bb-blocked .bb-fill { stroke: var(--pl-blocked); stroke-width: 2.5; stroke-dasharray: 6 3; }
 .bb-selected .bb-fill { stroke: var(--pl-highlight); stroke-width: 3; stroke-dasharray: none; }
-.bb-ring { stroke: var(--pl-progress); stroke-width: 3; stroke-linecap: butt; opacity: 0.85; }
-.bb-partial .bb-ring { stroke: var(--pl-partial); }       /* some open tasks blocked (decision 9) */
 .pl-bar.partial .pl-bar-fill { background: var(--pl-partial); }
 .b-partial { background: transparent; color: var(--pl-partial); border: 1px solid var(--pl-partial); }
 
@@ -214,12 +212,25 @@ html, body {
 .bb-dim .bb-label { fill: var(--pl-muted); }
 .bb-detail { fill: var(--pl-text); opacity: 0.8; paint-order: stroke; stroke: var(--pl-bg); stroke-width: 2.5px; stroke-linejoin: round; }
 .bb-dim .bb-detail { fill: var(--pl-muted); }
-/* Due pressure (decision 12): a small red bubble with the count; pulsing under 25 % of the span left, steady under 10 %. */
-.bb-due circle { fill: #c93b2b; stroke: var(--pl-bg); stroke-width: 1.5; }
-.bb-due text { fill: #fff3ea; font-weight: 700; }
-.bb-due.soon circle { animation: bb-pulse 1.6s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
-@keyframes bb-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(1.18); } }
-@media (prefers-reduced-motion: reduce) { .bb-due.soon circle { animation: none; } }
+/* The ring (decision 15): tasks beneath by state, one colour each. */
+.bb-seg { stroke-width: 4; stroke-linecap: butt; }
+.seg-due { stroke: #d0352a; background: #d0352a; }
+.seg-near { stroke: #e08a2e; background: #e08a2e; }
+.seg-blocked { stroke: var(--pl-plum); background: var(--pl-plum); }
+.seg-open { stroke: var(--pl-progress); background: var(--pl-progress); }
+.seg-done { stroke: var(--pl-done); background: var(--pl-done); opacity: 0.7; }
+.bb-legend { position: absolute; left: 12px; bottom: 10px; margin: 0; padding: 6px 10px; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--pl-muted); background: rgb(28 23 20 / 0.75); border: 1px solid var(--pl-border); border-radius: var(--pl-radius); pointer-events: none; }
+.bb-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.bb-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+/* The radial (decision 14): Edit and Open beside a tapped bubble, at screen size. */
+.bb-menu-item { cursor: pointer; }
+.bb-menu-item line { stroke: var(--pl-highlight); stroke-width: 1.5; opacity: 0.8; }
+.bb-menu-item circle { fill: var(--pl-surface-2); stroke: var(--pl-highlight); stroke-width: 2; }
+.bb-menu-item.open circle { fill: var(--pl-accent); stroke: var(--pl-accent); }
+.bb-menu-item text { fill: var(--pl-text); font-size: 12px; font-weight: 600; pointer-events: none; }
+.bb-menu-item.open text { fill: #1c1714; }
+.bb-menu-item:hover circle, .bb-menu-item:focus-visible circle { stroke: var(--pl-text); }
+.bb-menu-item:focus-visible { outline: none; }
 /* Typed links, rim to rim: solid within a domain, dotted across (decision 7). */
 .bb-link-halo { stroke: var(--pl-bg); stroke-width: 5; opacity: 0.7; }
 .bb-link-line { stroke: var(--pl-link); stroke-width: 2; }

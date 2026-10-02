@@ -76,7 +76,7 @@ describe('layout', () => {
     expect(ids(atHive.nodes).sort()).toEqual(['N3', 'N4']);
     expect(node(atHive, 'N4').children).toBe(1); // buy glue
     expect(node(atHive, 'N4').percent).toBe(100);
-    expect(node(atHive, 'N3').percent).toBeNull(); // a lone task has no ring
+    expect(node(atHive, 'N3').percent).toBeNull(); // a lone task has nothing to roll up
     expect(lay(b, 'N7').nodes).toEqual([]);
   });
 
@@ -94,27 +94,41 @@ describe('layout', () => {
     expect(lines(lay(b, 'N2'))).toEqual([['N11', 'N3', 'blockedBy', false]]);
   });
 
-  it('summarises what is inside: attachments and due pressure (decision 12)', () => {
+  it('splits the ring by task state, one state per task, most pressing first (decision 15)', () => {
     // TODAY is 2026-10-01. Spans start 2026-09-30 (fixture `start`).
     const b = build({
-      [B + 'soon.md']: nodeText({ id: 'N13', type: 'task', title: 'Soon', domain: 'beta', parent: 'q4-sourcing', due: '2026-10-01' }), // 0 % left today
-      [B + 'later.md']: nodeText({ id: 'N14', type: 'task', title: 'Later', domain: 'beta', parent: 'q4-sourcing', due: '2026-10-30' }), // 29/30 left
-      [B + 'done-late.md']: nodeText({ id: 'N15', type: 'task', title: 'Done late', domain: 'beta', parent: 'q4-sourcing', due: '2026-09-25', status: 'done' }), // closed: ignored
+      [B + 'soon.md']: nodeText({ id: 'N13', type: 'task', title: 'Soon', domain: 'beta', parent: 'q4-sourcing', due: '2026-10-01' }), // 0 % left today → due
+      [B + 'near.md']: nodeText({ id: 'N14', type: 'task', title: 'Near', domain: 'beta', parent: 'q4-sourcing', due: '2026-10-05' }).replace('start: 2026-09-30', 'start: 2026-09-01'), // 4/34 ≈ 12 % → near
+      [B + 'later.md']: nodeText({ id: 'N15', type: 'task', title: 'Later', domain: 'beta', parent: 'q4-sourcing', due: '2026-10-30' }), // 29/30 left → open
+      [B + 'done-late.md']: nodeText({ id: 'N16', type: 'task', title: 'Done late', domain: 'beta', parent: 'q4-sourcing', due: '2026-09-25', status: 'done' }), // done wins over overdue
+      [B + 'held.md']: nodeText({ id: 'N17', type: 'subproject', title: 'Held', domain: 'beta', parent: 'q4-sourcing', status: 'on-hold' }),
+      [B + 'under-held.md']: nodeText({ id: 'N18', type: 'task', title: 'Under held', domain: 'beta', parent: 'held' }), // blocked through its parent
     });
     const l = lay(b, null);
     const q4 = node(l, 'N6');
-    expect(q4.children).toBe(4);
-    // Confirm quote is overdue (due 2026-09-20) and Soon is at 0 %: both under 10 %.
-    expect(q4.dueSoon).toBe(2);
-    expect(q4.dueCritical).toBe(2);
-    expect(node(l, 'N1').dueSoon).toBe(0); // paint gangers: due 10 Oct, 9/10 left
+    expect(q4.children).toBe(6);
+    // Confirm quote is overdue AND blocked: due wins.
+    expect(q4.ring).toEqual({ due: 2, near: 1, blocked: 1, open: 1, done: 1, total: 6 });
+    expect(node(l, 'N1').ring).toEqual({ due: 0, near: 0, blocked: 0, open: 2, done: 1, total: 3 }); // paint gangers 9/10 left, build terrain no due, buy glue done
     expect(q4.attachments).toBe(0);
+  });
+
+  it('has no ring for a lone task', () => {
+    const atHive = lay(build(), 'N2');
+    expect(node(atHive, 'N3').ring).toBeNull();
+    expect(node(atHive, 'N4').ring).toEqual({ due: 0, near: 0, blocked: 0, open: 0, done: 1, total: 1 });
   });
 
   it('counts Drive links as attachments across the subtree', () => {
     const withDrive = nodeText({ id: 'N16', type: 'task', title: 'Docs', domain: 'alpha', parent: 'hive' }).replace('drive: []', 'drive: ["https://example.test/a", "https://example.test/b"]');
     const l = lay(build({ [A + 'docs.md']: withDrive }), null);
     expect(node(l, 'N1').attachments).toBe(2);
+  });
+
+  it('fixture tasks do not declare start, so the fixture start date applies', () => {
+    // Guard for the ring test above: the fixture writes `start: 2026-09-30` on every node.
+    const { g } = build();
+    expect(g.nodes.get('N7')?.start).toBe('2026-09-30');
   });
 
   it('computes time left as a share of the start→due span', () => {
