@@ -33,7 +33,7 @@ html, body {
   -webkit-text-size-adjust: 100%;
 }
 
-#app { min-height: 100dvh; display: flex; flex-direction: column; }
+#app { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; } /* fixed height: pages scroll inside .pl-main */
 
 .pl-header {
   display: flex; align-items: center; gap: var(--pl-gap);
@@ -43,7 +43,7 @@ html, body {
 }
 .pl-header h1 { font-size: 18px; margin: 0; font-weight: 600; }
 
-.pl-main { flex: 1; padding: 16px; max-width: 960px; width: 100%; margin: 0 auto; }
+.pl-main { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; max-width: 960px; width: 100%; margin: 0 auto; }
 
 .pl-card {
   background: var(--pl-surface); border: 1px solid var(--pl-border);
@@ -177,9 +177,9 @@ html, body {
 .pl-modal-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.55); display: grid; place-items: center; padding: 16px; z-index: 20; }
 .pl-modal { width: min(480px, 100%); margin: 0; max-height: 90dvh; overflow-y: auto; }
 /* Bubble view (blueprint §5.1). Fills the main area; the SVG is the gesture surface. */
-.pl-main-fill { padding: 0; max-width: none; display: flex; min-height: 0; }
-.pl-bubble { flex: 1; min-height: 0; min-width: 0; position: relative; }
-.bb-svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+.pl-main-fill { padding: 0; max-width: none; position: relative; overflow: hidden; min-height: 0; }
+.pl-bubble { position: absolute; inset: 0; } /* sized by its parent only; the SVG never sizes the box (phone drift fix) */
+.bb-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
 .bb-empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
 .bb-node { cursor: pointer; }
 .bb-node:focus-visible { outline: none; }
@@ -191,9 +191,6 @@ html, body {
 .t-project .bb-fill { fill: #8f5a37; }
 .t-subproject .bb-fill { fill: #7a6040; }
 .t-task .bb-fill { fill: #5c4a3c; }
-.bb-d2.t-project .bb-fill { fill: #74482c; }
-.bb-d2.t-subproject .bb-fill { fill: #624c33; }
-.bb-d2.t-task .bb-fill { fill: #4a3b30; }
 .st-active .bb-fill { stroke: var(--pl-progress); stroke-width: 2; }
 .st-hold .bb-fill { stroke: var(--pl-blocked); stroke-width: 2; }
 .st-done .bb-fill { stroke: var(--pl-done); stroke-width: 2; }
@@ -201,7 +198,6 @@ html, body {
 .bb-blocked .bb-fill { stroke: var(--pl-blocked); stroke-width: 2.5; stroke-dasharray: 6 3; }
 .bb-selected .bb-fill { stroke: var(--pl-highlight); stroke-width: 3; stroke-dasharray: none; }
 .bb-ring { stroke: var(--pl-progress); stroke-width: 3; stroke-linecap: butt; opacity: 0.85; }
-.bb-d2 .bb-ring { stroke: var(--pl-highlight); stroke-width: 2; opacity: 0.7; }
 .bb-partial .bb-ring { stroke: var(--pl-partial); }       /* some open tasks blocked (decision 9) */
 .pl-bar.partial .pl-bar-fill { background: var(--pl-partial); }
 .b-partial { background: transparent; color: var(--pl-partial); border: 1px solid var(--pl-partial); }
@@ -215,9 +211,15 @@ html, body {
 .pl-crumb-sep { color: var(--pl-muted); padding: 0 2px; }
 .bb-text { pointer-events: none; }
 .bb-label { fill: var(--pl-text); font-weight: 600; pointer-events: none; paint-order: stroke; stroke: var(--pl-bg); stroke-width: 3px; stroke-linejoin: round; }
-.bb-d2 .bb-label { stroke: none; } /* centred in its own circle: nothing to read through */
-.bb-beneath { fill: var(--pl-muted); pointer-events: none; }
 .bb-dim .bb-label { fill: var(--pl-muted); }
+.bb-detail { fill: var(--pl-text); opacity: 0.8; paint-order: stroke; stroke: var(--pl-bg); stroke-width: 2.5px; stroke-linejoin: round; }
+.bb-dim .bb-detail { fill: var(--pl-muted); }
+/* Due pressure (decision 12): a small red bubble with the count; pulsing under 25 % of the span left, steady under 10 %. */
+.bb-due circle { fill: #c93b2b; stroke: var(--pl-bg); stroke-width: 1.5; }
+.bb-due text { fill: #fff3ea; font-weight: 700; }
+.bb-due.soon circle { animation: bb-pulse 1.6s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+@keyframes bb-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(1.18); } }
+@media (prefers-reduced-motion: reduce) { .bb-due.soon circle { animation: none; } }
 /* Typed links, rim to rim: solid within a domain, dotted across (decision 7). */
 .bb-link-halo { stroke: var(--pl-bg); stroke-width: 5; opacity: 0.7; }
 .bb-link-line { stroke: var(--pl-link); stroke-width: 2; }
@@ -226,7 +228,13 @@ html, body {
 .bb-link-end { fill: var(--pl-blocked); stroke: var(--pl-bg); stroke-width: 1.5; }
 .pl-viewtoggle { margin-right: auto; }
 .pl-viewtoggle button { padding: 0 14px; min-height: 36px; }
-@media (max-width: 480px) { .pl-viewtoggle button { padding: 0 10px; font-size: 14px; } }
+/* Phone width: the toolbar collapses (blueprint §9.1) — the app name goes, the toggle stays whole. */
+@media (max-width: 480px) {
+  .pl-header h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .pl-viewtoggle { flex: none; margin-right: auto; }
+  .pl-viewtoggle button { padding: 0 10px; font-size: 14px; }
+  .pl-header-actions .pl-button:not(.pl-icon) { padding: 0 10px; }
+}
 
 .pl-modal-wide { width: min(680px, 100%); }
 .pl-conflict { border-top: 1px solid var(--pl-border); padding-top: 12px; }
