@@ -192,6 +192,7 @@ html, body {
 .t-project .bb-fill { fill: #8f5a37; }
 .t-subproject .bb-fill { fill: #7a6040; }
 .t-task .bb-fill { fill: #5c4a3c; }
+.t-subtask .bb-fill { fill: #4a3b30; }
 .st-active .bb-fill { stroke: var(--pl-progress); stroke-width: 2; }
 .st-hold .bb-fill { stroke: var(--pl-blocked); stroke-width: 2; }
 .st-done .bb-fill { stroke: var(--pl-done); stroke-width: 2; }

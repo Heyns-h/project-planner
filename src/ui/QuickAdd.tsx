@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import type { Session, Snapshot } from '../app/session';
-import type { PlannerType } from '../core/types';
+import { PLANNER_TYPES, type PlannerType } from '../core/types';
+import { allowedParent } from '../core/validate';
 import { TYPE_LABEL } from './format';
 import { Picker } from './Picker';
 
@@ -14,11 +15,18 @@ interface Props {
   onDone: (id: string | null) => void;
 }
 
+const NEXT_BELOW: Record<PlannerType, PlannerType> = { project: 'subproject', subproject: 'task', task: 'subtask', subtask: 'subtask' };
+/** Parent choices offered: what the hierarchy rules accept without a warning (a project is never offered a parent). */
+export function canParent(child: PlannerType, parent: PlannerType): boolean {
+  return allowedParent(child, parent) === null;
+}
+
 export function QuickAdd({ session, snap, defaultParent, onDone }: Props) {
   const g = snap.graph;
   const domains = (snap.config?.domains ?? []).filter((d) => d.id !== 'system');
   const parentNode = defaultParent ? g.nodes.get(g.byStem.get(defaultParent) ?? '') : undefined;
-  const [type, setType] = useState<PlannerType>(parentNode ? (parentNode.plannerType === 'project' ? 'subproject' : 'task') : 'project');
+  // Default type: one step below the selected item (a sub-task's sibling for a sub-task).
+  const [type, setType] = useState<PlannerType>(parentNode ? NEXT_BELOW[parentNode.plannerType] : 'project');
   const [title, setTitle] = useState('');
   const [parent, setParent] = useState<string | null>(type === 'project' ? null : defaultParent);
   const [domain, setDomain] = useState(domains[0]?.id ?? '');
@@ -27,7 +35,7 @@ export function QuickAdd({ session, snap, defaultParent, onDone }: Props) {
   const [busy, setBusy] = useState(false);
 
   const options = [...g.nodes.values()]
-    .filter((x) => (type === 'subproject' ? x.plannerType !== 'task' : true))
+    .filter((x) => canParent(type, x.plannerType))
     .map((x) => ({ value: x.stem, label: x.title, hint: `${TYPE_LABEL[x.plannerType]} · ${x.domain}` }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
@@ -53,7 +61,7 @@ export function QuickAdd({ session, snap, defaultParent, onDone }: Props) {
       <form class="pl-card pl-form pl-modal" role="dialog" aria-modal="true" aria-label="Add item" onSubmit={submit}>
         <h2>Add</h2>
         <div class="pl-segmented" role="radiogroup" aria-label="Type">
-          {(['project', 'subproject', 'task'] as const).map((t) => (
+          {PLANNER_TYPES.map((t) => (
             <button type="button" key={t} role="radio" aria-checked={type === t} class={type === t ? 'on' : ''} onClick={() => setType(t)}>
               {TYPE_LABEL[t]}
             </button>

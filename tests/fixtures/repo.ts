@@ -11,7 +11,7 @@ export const TODAY = '2026-10-01';
 
 interface N {
   id: string;
-  type: 'project' | 'subproject' | 'task';
+  type: 'project' | 'subproject' | 'task' | 'subtask';
   title: string;
   domain: string;
   status?: string;

@@ -1,6 +1,6 @@
 import { descendants, nodeByStem } from './graph';
 import { statusInfo } from './status';
-import type { Graph, PlannerNode } from './types';
+import { isTaskLike, type Graph, type PlannerNode } from './types';
 
 // Roll-up (blueprint §4.6). Computed in memory, never written to files.
 //  - progress: share of descendant tasks that are done, archived excluded.
@@ -28,7 +28,7 @@ export interface Rollup {
 const isDone = (n: PlannerNode) => statusInfo(n.status).done;
 const inRollup = (n: PlannerNode) => statusInfo(n.status).inRollup;
 const closed = (n: PlannerNode) => isDone(n) || n.status === 'archived';
-const openTask = (n: PlannerNode) => n.plannerType === 'task' && inRollup(n) && !isDone(n);
+const openTask = (n: PlannerNode) => isTaskLike(n.plannerType) && inRollup(n) && !isDone(n);
 
 export function computeRollups(g: Graph, today: string): Map<string, Rollup> {
   const waiting = new Map<string, PlannerNode[]>();
@@ -64,8 +64,8 @@ export function computeRollups(g: Graph, today: string): Map<string, Rollup> {
   const out = new Map<string, Rollup>();
   for (const n of g.nodes.values()) {
     const d = desc(n.id);
-    const countedDesc = d.filter((t) => t.plannerType === 'task' && inRollup(t));
-    const leaves = countedDesc.length > 0 ? countedDesc : n.plannerType === 'task' && inRollup(n) ? [n] : [];
+    const countedDesc = d.filter((t) => isTaskLike(t.plannerType) && inRollup(t));
+    const leaves = countedDesc.length > 0 ? countedDesc : isTaskLike(n.plannerType) && inRollup(n) ? [n] : [];
     const done = leaves.filter(isDone).length;
     const total = leaves.length;
     const openLeaves = d.filter((t) => openTask(t) && isLeaf(t));

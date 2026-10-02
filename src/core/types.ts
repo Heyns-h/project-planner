@@ -14,7 +14,11 @@ export interface DomainDef {
   label: string; // display name
 }
 
-export type PlannerType = 'project' | 'subproject' | 'task';
+/** Hierarchy, top down. A sub-task sits under a task (decision 16, 2026-10-02). */
+export type PlannerType = 'project' | 'subproject' | 'task' | 'subtask';
+export const PLANNER_TYPES: readonly PlannerType[] = ['project', 'subproject', 'task', 'subtask'];
+/** Tasks and sub-tasks are what progress and the ring count. */
+export const isTaskLike = (t: PlannerType): boolean => t === 'task' || t === 'subtask';
 export type StoredStatus = 'idea' | 'active' | 'on-hold' | 'done' | 'archived';
 export type Priority = 'low' | 'medium' | 'high';
 

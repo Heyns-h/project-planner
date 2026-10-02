@@ -1,7 +1,8 @@
 import { isStoredStatus, statusLabel } from '../core/status';
 import type { Field, Graph, PlannerType, Priority, StoredStatus } from '../core/types';
 
-export const TYPE_LABEL: Record<PlannerType, string> = { project: 'Project', subproject: 'Sub-project', task: 'Task' };
+export const TYPE_LABEL: Record<PlannerType, string> = { project: 'Project', subproject: 'Sub-project', task: 'Task', subtask: 'Sub-task' };
+export const TYPE_PLURAL: Record<PlannerType, string> = { project: 'Projects', subproject: 'Sub-projects', task: 'Tasks', subtask: 'Sub-tasks' };
 export const PRIORITY_LABEL: Record<Priority, string> = { low: 'Low', medium: 'Medium', high: 'High' };
 export { statusLabel };
 

@@ -2,7 +2,7 @@ import { hierarchy, pack, type HierarchyCircularNode } from 'd3-hierarchy';
 import { childrenOf, descendants, nodeByStem, roots } from './graph';
 import type { Rollup } from './rollup';
 import { statusInfo } from './status';
-import type { Graph, PlannerNode } from './types';
+import { isTaskLike, PLANNER_TYPES, type Graph, type PlannerNode, type PlannerType } from './types';
 
 // Bubble layout (blueprint §5.1 as revised by decisions 11–12, 2026-10-02).
 // Pure: graph + view root → one level of free-floating circles, each named
@@ -28,8 +28,9 @@ export interface LayoutNode {
   partial: boolean;
   /** No open tasks: floor size and a darker shade. */
   dim: boolean;
-  /** What is inside (decision 12): items one level down, Drive links in the subtree. */
+  /** What is inside (decisions 12 and 16): items one level down; everything beneath by type; Drive links in the subtree. */
   children: number;
+  below: Record<PlannerType, number>;
   attachments: number;
   /** The ring (decision 15): every task beneath, in exactly one state. Null when there are none. */
   ring: Ring | null;
@@ -87,7 +88,7 @@ export interface LayoutOptions {
 const DEFAULTS: Required<LayoutOptions> = { padding: 24, spread: 1.18, floor: 1 };
 
 const isDone = (n: PlannerNode) => statusInfo(n.status).done;
-const counted = (n: PlannerNode) => n.plannerType === 'task' && statusInfo(n.status).inRollup;
+const counted = (n: PlannerNode) => isTaskLike(n.plannerType) && statusInfo(n.status).inRollup;
 const shown = (n: PlannerNode) => n.status !== 'archived';
 const closed = (n: PlannerNode) => isDone(n) || n.status === 'archived';
 
@@ -187,6 +188,7 @@ export function layout(g: Graph, rollups: ReadonlyMap<string, Rollup>, rootId: s
       partial: !(r?.blocked ?? false) && (r?.blockedTasks ?? 0) > 0,
       dim: p.data.open === 0,
       children: childrenOf(g, n.id).filter(shown).length,
+      below: countByType(desc.filter(shown)),
       attachments: subtree.reduce((sum, t) => sum + t.drive.length, 0),
       ring: ringOf(g, n, desc, today),
     };
@@ -194,6 +196,17 @@ export function layout(g: Graph, rollups: ReadonlyMap<string, Rollup>, rootId: s
 
   const nodes = (packed.children ?? []).map(toNode);
   return { width, height, nodes, links: links(g, nodes) };
+}
+
+function countByType(nodes: readonly PlannerNode[]): Record<PlannerType, number> {
+  const out = Object.fromEntries(PLANNER_TYPES.map((t) => [t, 0])) as Record<PlannerType, number>;
+  for (const n of nodes) out[n.plannerType]++;
+  return out;
+}
+
+/** The types that sit below `t` in the hierarchy: what a bubble of type `t` lists (decision 16). */
+export function typesBelow(t: PlannerType): PlannerType[] {
+  return PLANNER_TYPES.slice(PLANNER_TYPES.indexOf(t) + 1);
 }
 
 const LINK_FIELDS: readonly LinkKind[] = ['blockedBy', 'relates', 'references'];

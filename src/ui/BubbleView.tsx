@@ -2,8 +2,8 @@ import { select } from 'd3-selection';
 import { zoom as d3zoom, zoomIdentity, type D3ZoomEvent, type ZoomBehavior } from 'd3-zoom';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Snapshot } from '../app/session';
-import { layout, RING_STATES, type LayoutLink, type LayoutNode, type Ring, type RingState } from '../core/layout';
-import { STATUS_CLASS, TYPE_LABEL } from './format';
+import { layout, RING_STATES, typesBelow, type LayoutLink, type LayoutNode, type Ring, type RingState } from '../core/layout';
+import { STATUS_CLASS, TYPE_LABEL, TYPE_PLURAL } from './format';
 
 // Blueprint §5.1 and §5.3 as revised (decisions 11–15): one level of
 // free-floating circles, each named and summarising what is inside; a
@@ -65,11 +65,19 @@ function bucket(k: number): number {
   return 2 ** (Math.round(Math.log2(k) * 2) / 2);
 }
 
+/**
+ * What is beneath a bubble, one line per type below its own (decision 16),
+ * plus a Files line when there are Drive links.
+ */
+function insideLines(n: LayoutNode): string[] {
+  const lines = typesBelow(n.node.plannerType).map((t) => `${TYPE_PLURAL[t]}: ${n.below[t]}`);
+  if (n.attachments > 0) lines.push(`Files: ${n.attachments}`);
+  return lines;
+}
+
 function inside(n: LayoutNode): string {
-  const parts: string[] = [];
-  parts.push(n.children === 0 ? 'nothing inside' : n.children === 1 ? '1 inside' : `${n.children} inside`);
-  if (n.attachments > 0) parts.push(`${n.attachments} file${n.attachments === 1 ? '' : 's'}`);
-  return parts.join(' · ');
+  const lines = insideLines(n);
+  return lines.length ? lines.join(', ') : 'nothing beneath';
 }
 
 function ringText(r: Ring | null): string {
@@ -89,17 +97,24 @@ function Label({ n, k }: { n: LayoutNode; k: number }) {
   if (onScreen < NAME_MIN_R) return null;
   const width = n.r * 1.7;
   const name = fit(n.node.title, width, Math.min(16, 20 / k));
-  const detail = onScreen >= DETAIL_MIN_R ? fit(inside(n), width, Math.min(11, 14 / k), 8) : null;
+  // Detail lines: as many as fit in the circle at this zoom, smallest first to go.
+  const detailSize = Math.max(8, Math.min(11, 14 / k, name.size * 0.72));
+  const lineH = detailSize * 1.25;
+  const all = onScreen >= DETAIL_MIN_R ? insideLines(n) : [];
+  const room = Math.max(0, Math.floor((n.r * 1.3 - name.size) / lineH));
+  const lines = all.slice(0, room).map((t) => fit(t, width, detailSize, 8).text);
+  const block = name.size + lines.length * lineH;
+  const top = -block / 2 + name.size / 2;
   return (
     <g class={`bb-text ${STATUS_CLASS[n.node.status]}${n.dim ? ' bb-dim' : ''}`} transform={`translate(${n.x},${n.y})`} aria-hidden="true">
-      <text class="bb-label" text-anchor="middle" dominant-baseline="central" font-size={name.size} y={detail ? -name.size * 0.45 : 0}>
+      <text class="bb-label" text-anchor="middle" dominant-baseline="central" font-size={name.size} y={top}>
         {name.text}
       </text>
-      {detail && (
-        <text class="bb-detail" text-anchor="middle" dominant-baseline="central" font-size={detail.size} y={name.size * 0.6}>
-          {detail.text}
+      {lines.map((t, i) => (
+        <text key={i} class="bb-detail" text-anchor="middle" dominant-baseline="central" font-size={detailSize} y={top + name.size * 0.5 + lineH * (i + 0.6)}>
+          {t}
         </text>
-      )}
+      ))}
     </g>
   );
 }

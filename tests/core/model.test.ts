@@ -69,7 +69,7 @@ describe('parse', () => {
   });
 
   it('flags missing guide keys, a title: key and dotpm-style values', () => {
-    const content = '---\nplanner_id: X\ntitle: Old\nstatus: todo\nplanner_type: subtask\n---\n';
+    const content = '---\nplanner_id: X\ntitle: Old\nstatus: todo\nplanner_type: epic\n---\n';
     const n = parseNode({ path: '01-Alpha/07-planner/old.md', sha: 'x', content }, DOMAINS)!;
     const codes = n.problems.map((p) => `${p.code}:${p.field ?? ''}`);
     expect(codes).toContain('missing-key:aliases');

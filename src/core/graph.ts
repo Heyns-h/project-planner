@@ -64,7 +64,7 @@ function push(m: Map<string, string[]>, k: string, v: string): void {
 
 function compareNodes(a: PlannerNode | undefined, b: PlannerNode | undefined): number {
   if (!a || !b) return 0;
-  const rank = { project: 0, subproject: 1, task: 2 } as const;
+  const rank = { project: 0, subproject: 1, task: 2, subtask: 3 } as const;
   return rank[a.plannerType] - rank[b.plannerType] || a.title.localeCompare(b.title);
 }
 

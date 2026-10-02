@@ -5,6 +5,7 @@ import type { Field, PlannerNode, Priority, StoredStatus } from '../core/types';
 import { STATUSES } from '../core/status';
 import { safeUrl, TYPE_LABEL } from './format';
 import { Picker, type Option } from './Picker';
+import { canParent } from './QuickAdd';
 import { TagDialog } from './TagDialog';
 
 // Blueprint §6: edit every property. Side panel on wide screens, bottom sheet
@@ -68,8 +69,8 @@ export function Inspector({ session, snap, node: n, onClose, onSelect, onReview,
       .filter(filter)
       .map((x) => ({ value: x.stem, label: x.title, hint: `${TYPE_LABEL[x.plannerType]} · ${x.domain}` }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  // A sub-project or project goes under a project or sub-project; a task may go under anything.
-  const parentOptions = nodeOptions((x) => !excluded.has(x.id) && (n.plannerType === 'task' || x.plannerType !== 'task'));
+  // Parents offered are what the hierarchy rules accept; a project may also be moved under a project or sub-project.
+  const parentOptions = nodeOptions((x) => !excluded.has(x.id) && (n.plannerType === 'project' ? x.plannerType === 'project' || x.plannerType === 'subproject' : canParent(n.plannerType, x.plannerType)));
   const blockerOptions = nodeOptions((x) => x.id !== n.id);
   const personOptions: Option[] = [...g.people.values()].map((p) => ({ value: p.stem, label: p.name, hint: p.domain })).sort((a, b) => a.label.localeCompare(b.label));
   const noteOptions: Option[] = snap.noteStems.map((s) => ({ value: s, label: g.nodes.get(g.byStem.get(s) ?? '')?.title ?? s }));

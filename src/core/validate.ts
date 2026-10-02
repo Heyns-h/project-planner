@@ -51,7 +51,9 @@ function hierarchyProblem(g: Graph, n: PlannerNode): PlannerNode['problems'][num
 /** Blueprint §4.5. Returns a warning message, or null when allowed. */
 export function allowedParent(child: PlannerType, parent: PlannerType): string | null {
   if (child === 'project') return 'A project nested under another node (allowed, but unusual)';
-  if (child === 'subproject' && parent === 'task') return 'A subproject should sit under a project or subproject, not a task';
+  if (child === 'subproject' && (parent === 'task' || parent === 'subtask')) return 'A subproject should sit under a project or subproject, not a task';
+  if (child === 'task' && parent === 'subtask') return 'A task should not sit under a sub-task';
+  if (child === 'subtask' && parent !== 'task') return 'A sub-task should sit under a task';
   return null;
 }
 

@@ -5,6 +5,7 @@ import { parseLink, parseLinkList } from './links';
 import { isStoredStatus } from './status';
 import { parseTagTable } from './tags';
 import type { DomainDef, Person, PlannerNode, PlannerType, Priority, Problem, RepoFile, TagList } from './types';
+import { PLANNER_TYPES } from './types';
 
 // File → typed record. Parsing never throws: anything wrong becomes a Problem
 // on the node, and a node with errors that would make a write unsafe is marked
@@ -13,7 +14,6 @@ import type { DomainDef, Person, PlannerNode, PlannerType, Priority, Problem, Re
 /** The vault guide's nine keys (vault-check.sh check 3). */
 export const GUIDE_KEYS = ['type', 'domain', 'project', 'version', 'status', 'tags', 'created', 'updated', 'aliases'] as const;
 
-const PLANNER_TYPES: readonly PlannerType[] = ['project', 'subproject', 'task'];
 const PRIORITIES: readonly Priority[] = ['low', 'medium', 'high'];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -53,7 +53,7 @@ export function parseNode(file: RepoFile, domains: readonly DomainDef[]): Planne
   const rawType = str(d['planner_type']);
   let plannerType: PlannerType = 'task';
   if (rawType && (PLANNER_TYPES as readonly string[]).includes(rawType)) plannerType = rawType as PlannerType;
-  else problems.push({ code: 'bad-value', severity: 'warning', field: 'planner_type', message: `planner_type "${rawType ?? ''}" is not project, subproject or task; treated as task` });
+  else problems.push({ code: 'bad-value', severity: 'warning', field: 'planner_type', message: `planner_type "${rawType ?? ''}" is not project, subproject, task or subtask; treated as task` });
 
   const rawStatus = d['status'];
   const status = isStoredStatus(rawStatus) ? rawStatus : 'idea';
