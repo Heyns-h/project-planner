@@ -178,11 +178,25 @@ function LinkEnd({ link }: { link: LayoutLink }) {
 interface CircleProps {
   n: LayoutNode;
   active: boolean;
-  onTap: (n: LayoutNode) => void;
+  onTap: (n: LayoutNode, pointer: string) => void;
+  onPress: (n: LayoutNode) => void; // touch: hold
   onOpen: (n: LayoutNode) => void;
 }
 
-function Circle({ n, active, onTap, onOpen }: CircleProps) {
+const PRESS_MS = 450;
+const PRESS_SLOP = 8; // px of movement that turns a hold into a pan
+
+function Circle({ n, active, onTap, onPress, onOpen }: CircleProps) {
+  // Long-press detection on Pointer Events; d3-zoom listens to touch events
+  // and does not cancel these (L11). A hold with no movement fires onPress
+  // and swallows the click that Android sends afterwards.
+  const press = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  const swallow = useRef(false);
+  const pointer = useRef('mouse');
+  const cancel = () => {
+    if (press.current) clearTimeout(press.current.timer);
+    press.current = null;
+  };
   const cls = ['bb-node', `t-${n.node.plannerType}`, STATUS_CLASS[n.node.status], n.dim ? 'bb-dim' : '', n.blocked ? 'bb-blocked' : '', n.partial ? 'bb-partial' : '', active ? 'bb-selected' : '', toneClass(n)]
     .filter(Boolean)
     .join(' ');
@@ -195,9 +209,33 @@ function Circle({ n, active, onTap, onOpen }: CircleProps) {
       role="button"
       tabIndex={0}
       aria-label={`${n.node.title}, ${TYPE_LABEL[n.node.plannerType]}, ${inside(n)}${tasks}`}
+      onPointerDown={(e) => {
+        pointer.current = e.pointerType;
+        if (e.pointerType !== 'touch' || !e.isPrimary) return;
+        cancel();
+        press.current = {
+          x: e.clientX,
+          y: e.clientY,
+          timer: setTimeout(() => {
+            press.current = null;
+            swallow.current = true;
+            onPress(n);
+          }, PRESS_MS),
+        };
+      }}
+      onPointerMove={(e) => {
+        if (press.current && Math.hypot(e.clientX - press.current.x, e.clientY - press.current.y) > PRESS_SLOP) cancel();
+      }}
+      onPointerUp={cancel}
+      onPointerCancel={cancel}
+      onPointerLeave={cancel}
       onClick={(e) => {
         e.stopPropagation();
-        onTap(n);
+        if (swallow.current) {
+          swallow.current = false;
+          return;
+        }
+        onTap(n, pointer.current);
       }}
       onDblClick={(e) => {
         e.stopPropagation();
@@ -209,7 +247,7 @@ function Circle({ n, active, onTap, onOpen }: CircleProps) {
           onOpen(n);
         } else if (e.key === ' ') {
           e.preventDefault();
-          onTap(n);
+          onTap(n, 'keyboard');
         }
       }}
     >
@@ -227,10 +265,8 @@ function Radial({ n, k, onEdit, onOpen }: { n: LayoutNode; k: number; onEdit: ()
   const rk = n.r * k;
   const dist = rk + 34;
   const R = 22;
-  const items = [
-    { label: 'Edit', angle: -128, act: onEdit, cls: 'edit' },
-    { label: 'Open', angle: -52, act: onOpen, cls: 'open' },
-  ];
+  void onOpen; // Open stays available for later; drill-down is double-tap / double-click (decision 17)
+  const items = [{ label: 'Edit', angle: -90, act: onEdit, cls: 'edit' }];
   return (
     <g class="bb-menu" transform={`translate(${n.x},${n.y}) scale(${1 / k})`} role="menu" aria-label={`${n.node.title}: actions`}>
       {items.map((it) => {
@@ -291,10 +327,10 @@ export function BubbleView({ snap, root, selectedId, onSelect, onOpen }: Props) 
     const z = d3zoom<SVGSVGElement, unknown>()
       .scaleExtent(SCALE_EXTENT)
       .clickDistance(6)
-      .on('start', (e: D3ZoomEvent<SVGSVGElement, unknown>) => {
-        if (e.sourceEvent) setMenu(null);
-      })
+      // Only real movement closes the radial: d3 fires `start` on every
+      // touchstart and mousedown, which would close it before a tap lands.
       .on('zoom', (e: D3ZoomEvent<SVGSVGElement, unknown>) => {
+        if (e.sourceEvent) setMenu(null);
         worldRef.current?.setAttribute('transform', e.transform.toString());
         setK((prev) => (bucket(e.transform.k) === prev ? prev : bucket(e.transform.k)));
       })
@@ -314,10 +350,25 @@ export function BubbleView({ snap, root, selectedId, onSelect, onOpen }: Props) 
     worldRef.current?.setAttribute('transform', '');
     setK(1);
     setMenu(null);
+    setHighlight(null);
   }, [root, hasNodes]);
 
-  // A tap opens the radial for that bubble (decision 14); the same tap again closes it.
-  const onTap = (n: LayoutNode) => setMenu((m) => (m === n.node.id ? null : n.node.id));
+  // Decision 17: with a mouse, a click opens the radial (click again closes
+  // it); on touch, a tap only highlights, a hold opens the radial, and a
+  // double-tap drills down (the browser's dblclick, which d3's own is not).
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const onTap = (n: LayoutNode, pointer: string) => {
+    if (pointer === 'touch') {
+      setHighlight((h) => (h === n.node.id ? null : n.node.id));
+      setMenu(null);
+    } else {
+      setMenu((m) => (m === n.node.id ? null : n.node.id));
+    }
+  };
+  const onPress = (n: LayoutNode) => {
+    setHighlight(n.node.id);
+    setMenu(n.node.id);
+  };
   const menuNode = menu ? lay?.nodes.find((n) => n.node.id === menu) : undefined;
 
   return (
@@ -335,8 +386,10 @@ export function BubbleView({ snap, root, selectedId, onSelect, onOpen }: Props) 
             aria-label="Projects as bubbles"
             onClick={() => {
               setMenu(null);
+              setHighlight(null);
               onSelect(null);
             }}
+            onContextMenu={(e) => e.preventDefault()}
           >
             <g class="pl-world" ref={worldRef}>
               <g class="bb-links" aria-hidden="true">
@@ -346,7 +399,14 @@ export function BubbleView({ snap, root, selectedId, onSelect, onOpen }: Props) 
               </g>
               <g class="bb-circles">
                 {lay.nodes.map((n) => (
-                  <Circle key={n.node.id} n={n} active={menu === n.node.id || selectedId === n.node.id} onTap={onTap} onOpen={(x) => onOpen(x.node.id)} />
+                  <Circle
+                    key={n.node.id}
+                    n={n}
+                    active={menu === n.node.id || highlight === n.node.id || selectedId === n.node.id}
+                    onTap={onTap}
+                    onPress={onPress}
+                    onOpen={(x) => onOpen(x.node.id)}
+                  />
                 ))}
               </g>
               <g class="bb-labels">
