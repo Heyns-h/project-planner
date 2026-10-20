@@ -184,6 +184,30 @@ describe('sync scenarios (plan §8)', () => {
   });
 });
 
+describe('cache healing', () => {
+  it('fetches indexed content files that are missing from the cache even when the branch has not moved', async () => {
+    // 2026-10-20: a device on the old build pulled the reshaped sandbox, kept the
+    // index and the commit, but cached none of the new paths. The new build must
+    // not trust "ref unchanged" and show nothing.
+    const laptop = await device('laptop');
+    const first = await laptop.sync();
+    expect(first.pulled.fetched).toBeGreaterThan(0);
+    const index = await laptop.store.allIndex();
+    const all = (await laptop.store.allFiles()).map((f) => f.path);
+    await laptop.store.applyPull({ index, put: [], remove: all, commit: first.pulled.commit!, tree: (await laptop.store.getMeta('lastTree'))!, etag: await laptop.store.getMeta('refEtag') ?? null, at: '2026-10-20T00:00:00Z' });
+    expect(await laptop.store.allFiles()).toEqual([]);
+    const healed = await laptop.sync();
+    expect(fake.head).toBe(first.pulled.commit); // nothing new on the branch
+    expect(healed.pulled.changed).toBe(true);
+    expect(healed.pulled.fetched).toBe(all.length);
+    expect((await laptop.store.allFiles()).map((f) => f.path).sort()).toEqual([...all].sort());
+    // And a plain unchanged check afterwards fetches nothing but still counts as a sync.
+    const quiet = await laptop.sync();
+    expect(quiet.pulled).toMatchObject({ changed: false, fetched: 0 });
+    expect(await laptop.store.getMeta('lastSyncAt')).toBeTruthy();
+  });
+});
+
 describe('conflicts and batches', () => {
   it('holds back a whole batch when one of its ops conflicts', async () => {
     const laptop = await device('laptop');

@@ -38,6 +38,21 @@ export async function pull(gh: GitHub, store: Store, branch: string, now = () =>
   const ref = await gh.getRef(branch, last ? etag : null);
   if (ref === null || ref.sha === last) {
     if (last && !(await store.getMeta('lastTree'))) await store.setMeta('lastTree', await gh.getCommitTree(last));
+    await store.setMeta('lastSyncAt', now().toISOString()); // a successful check counts as a sync
+    // Heal the cache: content files that are indexed but not cached — after
+    // an app update changed what counts as content (the hub layout, 2026-10-20),
+    // or after eviction — are fetched even though the branch has not moved.
+    if (last) {
+      const index = await store.allIndex();
+      const cached = new Set((await store.allFiles()).map((f) => f.path));
+      const missing = index.filter((e) => isContentPath(e.path) && !cached.has(e.path));
+      if (missing.length > 0) {
+        const put: RepoFile[] = await mapLimit(missing, BLOB_CONCURRENCY, async (e) => ({ path: e.path, sha: e.sha, content: await gh.getBlobText(e.sha) }));
+        const tree = (await store.getMeta('lastTree')) ?? (await gh.getCommitTree(last));
+        await store.applyPull({ index, put, remove: [], commit: last, tree, etag, at: now().toISOString() });
+        return { changed: true, commit: last, fetched: put.length, removed: 0 };
+      }
+    }
     return { changed: false, commit: last, fetched: 0, removed: 0 };
   }
 
