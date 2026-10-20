@@ -3,7 +3,7 @@ import type { Session, Snapshot } from '../app/session';
 import { descendants } from '../core/graph';
 import type { Field, PlannerNode, Priority, StoredStatus } from '../core/types';
 import { STATUSES } from '../core/status';
-import { safeUrl, TYPE_LABEL } from './format';
+import { repoUrl, safeUrl, TYPE_LABEL } from './format';
 import { Picker, type Option } from './Picker';
 import { canParent } from './QuickAdd';
 import { TagDialog } from './TagDialog';
@@ -74,9 +74,9 @@ export function Inspector({ session, snap, node: n, onClose, onSelect, onReview,
   const blockerOptions = nodeOptions((x) => x.id !== n.id);
   const personOptions: Option[] = [...g.people.values()].map((p) => ({ value: p.stem, label: p.name, hint: p.domain })).sort((a, b) => a.label.localeCompare(b.label));
   const noteOptions: Option[] = snap.noteStems.map((s) => ({ value: s, label: g.nodes.get(g.byStem.get(s) ?? '')?.title ?? s }));
-  const tagOptions: Option[] = (g.tags.get(n.domain)?.tags ?? []).map((t) => ({ value: t, label: t }));
+  const tagOptions: Option[] = (g.tags.get(n.effectiveDomain)?.tags ?? []).map((t) => ({ value: t, label: t }));
   const addPerson = async (name: string, then: (stem: string) => void) => {
-    const r = await session.createPerson(name, n.domain);
+    const r = await session.createPerson(name, n.effectiveDomain);
     if (r.error) setError(r.error);
     else if (r.stem) then(r.stem);
   };
@@ -124,6 +124,19 @@ export function Inspector({ session, snap, node: n, onClose, onSelect, onReview,
       )}
 
       <TextField label="Title" value={n.title} disabled={ro} onSave={(v) => void save('title', v.trim())} />
+
+      {n.plannerType === 'project' && (
+        <fieldset class="pl-fieldset">
+          <legend class="pl-field-label">Home (v0.3 §4.7)</legend>
+          <TextField label="Repository (owner/name)" value={n.repo ?? ''} disabled={ro} onSave={(v) => void save('repo', v.trim() || null)} />
+          {repoUrl(n.repo) && (
+            <a href={repoUrl(n.repo)!} target="_blank" rel="noopener noreferrer">
+              Open on GitHub
+            </a>
+          )}
+          <TextField label="Folder name (not a path)" value={n.folder ?? ''} disabled={ro} onSave={(v) => void save('folder', v.trim() || null)} />
+        </fieldset>
+      )}
 
       <div class="pl-grid2">
         <label class="pl-field">
@@ -185,16 +198,16 @@ export function Inspector({ session, snap, node: n, onClose, onSelect, onReview,
         placeholder="Search people…"
       />
       <Picker
-        label={`Tags (${n.domain} list)`}
+        label={`Tags (${n.effectiveDomain} list)`}
         multi
         disabled={ro}
         options={tagOptions}
         selected={n.tags}
         onChange={(v) => void save('tags', v)}
         placeholder={tagOptions.length ? 'Search or add tags…' : 'No tags in this domain yet — type to add one'}
-        {...(g.tags.has(n.domain) ? { onCreate: (name: string) => setNewTag(name), createLabel: 'Add tag' } : {})}
+        {...(g.tags.has(n.effectiveDomain) ? { onCreate: (name: string) => setNewTag(name), createLabel: 'Add tag' } : {})}
       />
-      {newTag !== null && <TagDialog session={session} nodeId={n.id} domain={n.domain} initialName={newTag} onDone={() => setNewTag(null)} />}
+      {newTag !== null && <TagDialog session={session} nodeId={n.id} domain={n.effectiveDomain} initialName={newTag} onDone={() => setNewTag(null)} />}
       <Picker label="Blocked by" multi disabled={ro} options={blockerOptions} selected={n.blockedBy} onChange={(v) => void save('blockedBy', v)} placeholder="Search items…" />
       {(g.blocks.get(n.id) ?? []).length > 0 && (
         <p class="pl-muted">

@@ -8,7 +8,7 @@ import { DOMAINS, indexPaths, nodeText, repoFiles, TODAY } from '../fixtures/rep
 // Decision 16 (2026-10-02): sub-tasks under tasks; bubbles list what is
 // beneath them by type, only the types below their own.
 
-const A = '01-Alpha/07-planner/';
+const A = 'nodes/alpha/';
 
 describe('sub-tasks', () => {
   it('parse accepts planner_type subtask and the hierarchy rules place it under a task', () => {

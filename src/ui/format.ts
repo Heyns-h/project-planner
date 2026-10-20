@@ -20,6 +20,8 @@ export const FIELD_LABEL: Record<Field | 'body' | 'deleted', string> = {
   relates: 'Relates to',
   references: 'References',
   drive: 'Drive links',
+  repo: 'Repository',
+  folder: 'Folder',
   body: 'Notes',
   deleted: 'Item',
 };
@@ -67,6 +69,12 @@ export function shortDate(iso: string | null, today: string): string {
   if (!y || !m || !d) return iso;
   const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1];
   return today.startsWith(String(y)) ? `${d} ${month}` : `${d} ${month} ${y}`;
+}
+
+/** GitHub page of a project's home repo (v0.3 §4.7), or null when the value is not owner/name. */
+export function repoUrl(repo: string | null): string | null {
+  if (!repo || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) return null;
+  return `https://github.com/${repo.split('/').map(encodeURIComponent).join('/')}`;
 }
 
 /** Only http(s) links are ever rendered as links; anything else stays text. */

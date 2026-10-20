@@ -201,6 +201,9 @@ html, body {
 .bb-selected .bb-fill { stroke: var(--pl-highlight); stroke-width: 3; stroke-dasharray: none; }
 .pl-bar.partial .pl-bar-fill { background: var(--pl-partial); }
 .b-partial { background: transparent; color: var(--pl-partial); border: 1px solid var(--pl-partial); }
+.b-home { background: transparent; color: var(--pl-link); border: 1px solid var(--pl-link); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-fieldset { border: 1px solid var(--pl-border); border-radius: var(--pl-radius); padding: 10px 12px 12px; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.pl-fieldset legend { padding: 0 4px; }
 
 /* Breadcrumb (blueprint §5.3): where you are; each crumb is a navigation. */
 .pl-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 4px 16px; background: var(--pl-surface); border-bottom: 1px solid var(--pl-border); font-size: 14px; min-height: 36px; }

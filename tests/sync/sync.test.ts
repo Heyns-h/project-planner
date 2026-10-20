@@ -11,8 +11,8 @@ import { DOMAINS, FILES } from '../fixtures/repo';
 // The eight scenarios of plan §8, plus conflict handling. Two "devices" share
 // one fake GitHub; each has its own IndexedDB store and queue.
 
-const QUOTE = '02-Beta/07-planner/confirm-quote.md'; // N7
-const GANGERS = '01-Alpha/07-planner/paint-gangers.md'; // N3
+const QUOTE = 'nodes/beta/confirm-quote.md'; // N7
+const GANGERS = 'nodes/alpha/paint-gangers.md'; // N3
 let dbSeq = 0;
 let fake: FakeGitHub;
 let batchSeq = 0;
@@ -133,15 +133,15 @@ describe('sync scenarios (plan §8)', () => {
     await phone.sync();
     await laptop.sync();
     const node = (id: string): NewNode => ({ id, plannerType: 'task', title: 'Book courier', domain: 'beta', parent: 'q4-sourcing' });
-    await phone.enqueue([{ kind: 'create', node: node('P1'), path: '02-Beta/07-planner/book-courier.md' }], "add 'Book courier'");
+    await phone.enqueue([{ kind: 'create', node: node('P1'), path: 'nodes/beta/book-courier.md' }], "add 'Book courier'");
     await laptop.enqueue([
-      { kind: 'create', node: node('L1'), path: '02-Beta/07-planner/book-courier.md' },
+      { kind: 'create', node: node('L1'), path: 'nodes/beta/book-courier.md' },
     ], "add 'Book courier'");
     await phone.sync();
     await laptop.sync();
     const snap = fake.snapshot();
-    expect(snap['02-Beta/07-planner/book-courier.md']).toContain('planner_id: P1');
-    expect(snap['02-Beta/07-planner/book-courier-2.md']).toContain('planner_id: L1');
+    expect(snap['nodes/beta/book-courier.md']).toContain('planner_id: P1');
+    expect(snap['nodes/beta/book-courier-2.md']).toContain('planner_id: L1');
   });
 
   it('6b. a queued child of a renamed new item follows the rename', async () => {
@@ -149,14 +149,14 @@ describe('sync scenarios (plan §8)', () => {
     const laptop = await device('laptop');
     await phone.sync();
     await laptop.sync();
-    await phone.enqueue([{ kind: 'create', node: { id: 'P1', plannerType: 'subproject', title: 'Shipping', domain: 'beta', parent: 'q4-sourcing' }, path: '02-Beta/07-planner/shipping.md' }]);
+    await phone.enqueue([{ kind: 'create', node: { id: 'P1', plannerType: 'subproject', title: 'Shipping', domain: 'beta', parent: 'q4-sourcing' }, path: 'nodes/beta/shipping.md' }]);
     await phone.sync();
     await laptop.enqueue([
-      { kind: 'create', node: { id: 'L1', plannerType: 'subproject', title: 'Shipping', domain: 'beta', parent: 'q4-sourcing' }, path: '02-Beta/07-planner/shipping.md' },
-      { kind: 'create', node: { id: 'L2', plannerType: 'task', title: 'Pack', domain: 'beta', parent: 'shipping' }, path: '02-Beta/07-planner/pack.md' },
+      { kind: 'create', node: { id: 'L1', plannerType: 'subproject', title: 'Shipping', domain: 'beta', parent: 'q4-sourcing' }, path: 'nodes/beta/shipping.md' },
+      { kind: 'create', node: { id: 'L2', plannerType: 'task', title: 'Pack', domain: 'beta', parent: 'shipping' }, path: 'nodes/beta/pack.md' },
     ]);
     await laptop.sync();
-    expect(fake.snapshot()['02-Beta/07-planner/pack.md']).toContain('parent: "[[shipping-2]]"');
+    expect(fake.snapshot()['nodes/beta/pack.md']).toContain('parent: "[[shipping-2]]"');
   });
 
   it('7. the queue survives a restart and syncs afterwards', async () => {

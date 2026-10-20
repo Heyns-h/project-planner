@@ -1,9 +1,11 @@
 import type { Graph, PlannerNode, PlannerType, Stem } from './types';
 
-// Graph-level checks, mirroring vault-check.sh check 4 (every wikilink must
-// resolve to a file name in the repo) plus the hierarchy rules of blueprint
-// §4.5. Results are added to each node's problems. Parse-level checks
-// (nine keys, no title:, value formats) happen in parse.ts.
+// Graph-level checks of blueprint v0.3 §4.8: every wikilink resolves inside
+// the link space (rule 3), the domain is one of the tag files (rule 2), tags
+// are in the domain's vocabulary (rule 5), the hierarchy rules of §4.5 hold
+// and there are no cycles (rule 4). Results are added to each node's
+// problems. Parse-level checks (keys and order, value formats, home keys)
+// happen in parse.ts; stem uniqueness (rule 7) in graph.ts.
 
 export function validateGraph(g: Graph): void {
   for (const n of g.nodes.values()) {
@@ -24,6 +26,16 @@ export function validateGraph(g: Graph): void {
     }
     const h = hierarchyProblem(g, n);
     if (h) n.problems.push(h);
+    // Rule 2: the stored domain must be one of the tag files, when any exist.
+    if (g.tags.size > 0 && !g.tags.has(n.domain)) {
+      n.problems.push({ code: 'bad-value', severity: 'warning', field: 'domain', message: `domain "${n.domain}" has no tags/${n.domain}.md` });
+    }
+    // Rule 5: every tag is in the vocabulary of the node's effective domain.
+    const vocab = g.tags.get(n.effectiveDomain)?.tags;
+    if (vocab) {
+      const bad = n.tags.filter((t) => !vocab.includes(t));
+      if (bad.length) n.problems.push({ code: 'bad-value', severity: 'warning', field: 'tags', message: `Not in the ${n.effectiveDomain} tag list: ${bad.join(', ')}` });
+    }
   }
   for (const id of nodesInCycles(g)) {
     const n = g.nodes.get(id);
@@ -52,6 +64,7 @@ function hierarchyProblem(g: Graph, n: PlannerNode): PlannerNode['problems'][num
 export function allowedParent(child: PlannerType, parent: PlannerType): string | null {
   if (child === 'project') return 'A project nested under another node (allowed, but unusual)';
   if (child === 'subproject' && (parent === 'task' || parent === 'subtask')) return 'A subproject should sit under a project or subproject, not a task';
+  if (child === 'task' && parent === 'task') return 'A task under a task: new work under a task should be a sub-task';
   if (child === 'task' && parent === 'subtask') return 'A task should not sit under a sub-task';
   if (child === 'subtask' && parent !== 'task') return 'A sub-task should sit under a task';
   return null;

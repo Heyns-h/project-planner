@@ -7,9 +7,9 @@ import { FakeGitHub } from '../fake-github';
 
 const NODE = (id: string) => `---\nplanner_id: ${id}\n---\n`;
 const BASE = {
-  '01-Alpha/07-planner/a.md': NODE('A'),
-  '01-Alpha/07-planner/b.md': NODE('B'),
-  '01-Alpha/_alpha-tags.md': '---\ntype: reference\n---\n',
+  'nodes/alpha/a.md': NODE('A'),
+  'nodes/alpha/b.md': NODE('B'),
+  'tags/alpha.md': '---\ntype: reference\n---\n',
   '01-Alpha/02-projects/p/_p-moc.md': '---\ntype: moc\n---\n',
   'README.md': '# readme',
 };
@@ -31,9 +31,9 @@ describe('pull (blueprint §8.2)', () => {
     const r = await pull(gh, store, 'main');
     expect(r).toMatchObject({ changed: true, fetched: 3, removed: 0 });
     expect((await store.allFiles()).map((f) => f.path).sort()).toEqual([
-      '01-Alpha/07-planner/a.md',
-      '01-Alpha/07-planner/b.md',
-      '01-Alpha/_alpha-tags.md',
+      'nodes/alpha/a.md',
+      'nodes/alpha/b.md',
+      'tags/alpha.md',
     ]);
     expect((await store.allIndex()).length).toBe(5);
   });
@@ -48,8 +48,8 @@ describe('pull (blueprint §8.2)', () => {
 
   it('later pulls fetch only changed blobs and drop deleted files', async () => {
     await pull(gh, store, 'main');
-    const next: Record<string, string> = { ...BASE, '01-Alpha/07-planner/a.md': NODE('A') + 'edited\n' };
-    delete next['01-Alpha/07-planner/b.md'];
+    const next: Record<string, string> = { ...BASE, 'nodes/alpha/a.md': NODE('A') + 'edited\n' };
+    delete next['nodes/alpha/b.md'];
     await fake.commit(next);
     fake.calls = [];
     const r = await pull(gh, store, 'main');

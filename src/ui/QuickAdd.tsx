@@ -23,7 +23,7 @@ export function canParent(child: PlannerType, parent: PlannerType): boolean {
 
 export function QuickAdd({ session, snap, defaultParent, onDone }: Props) {
   const g = snap.graph;
-  const domains = (snap.config?.domains ?? []).filter((d) => d.id !== 'system');
+  const domains = snap.config?.domains ?? [];
   const parentNode = defaultParent ? g.nodes.get(g.byStem.get(defaultParent) ?? '') : undefined;
   // Default type: one step below the selected item (a sub-task's sibling for a sub-task).
   const [type, setType] = useState<PlannerType>(parentNode ? NEXT_BELOW[parentNode.plannerType] : 'project');
@@ -31,6 +31,8 @@ export function QuickAdd({ session, snap, defaultParent, onDone }: Props) {
   const [parent, setParent] = useState<string | null>(type === 'project' ? null : defaultParent);
   const [domain, setDomain] = useState(domains[0]?.id ?? '');
   const [due, setDue] = useState('');
+  const [repo, setRepo] = useState('');
+  const [folder, setFolder] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -48,6 +50,8 @@ export function QuickAdd({ session, snap, defaultParent, onDone }: Props) {
       parent: type === 'project' ? null : parent,
       ...(type === 'project' ? { domain } : {}),
       ...(due ? { due } : {}),
+      ...(type === 'project' && repo.trim() ? { repo: repo.trim() } : {}),
+      ...(type === 'project' && folder.trim() ? { folder: folder.trim() } : {}),
     });
     setBusy(false);
     if (r.error) setError(r.error);
@@ -89,6 +93,18 @@ export function QuickAdd({ session, snap, defaultParent, onDone }: Props) {
           Due (optional)
           <input type="date" value={due} onInput={(e) => setDue(e.currentTarget.value)} />
         </label>
+        {type === 'project' && (
+          <>
+            <label>
+              Repository (optional, owner/name)
+              <input value={repo} onInput={(e) => setRepo(e.currentTarget.value)} placeholder="owner/name" spellcheck={false} />
+            </label>
+            <label>
+              Folder name (optional, not a path)
+              <input value={folder} onInput={(e) => setFolder(e.currentTarget.value)} spellcheck={false} />
+            </label>
+          </>
+        )}
         {error && (
           <p class="pl-error" role="alert">
             {error}

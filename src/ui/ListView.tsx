@@ -36,7 +36,7 @@ function compare(sort: Sort): (a: PlannerNode, b: PlannerNode) => number {
 }
 
 function matches(n: PlannerNode, f: Filters): boolean {
-  if (f.domain && n.domain !== f.domain) return false;
+  if (f.domain && n.effectiveDomain !== f.domain) return false;
   if (f.status === 'all') return n.status !== 'archived';
   if (f.status === 'open') return n.status !== 'done' && n.status !== 'archived';
   return n.status === f.status;
@@ -197,6 +197,11 @@ export function ListView({ snap, root, selectedId, onSelect, onOpen }: Props) {
                 {r?.overdue && <span class="pl-badge b-overdue">overdue</span>}
                 {problems > 0 && <span class="pl-badge b-problem" title={n.problems.map((p) => p.message).join('\n')}>⚠ {problems}</span>}
                 {n.readOnly && <span class="pl-badge b-problem">read-only</span>}
+                {(n.repo || n.folder) && (
+                  <span class="pl-badge b-home" title={n.repo ? `Repository ${n.repo}` : `Folder ${n.folder}`}>
+                    ⌂ {n.repo ?? n.folder}
+                  </span>
+                )}
                 {snap.pendingNodes.has(n.id) && <span class="pl-dot" title="Changes not synced yet" aria-label="not synced" />}
               </span>
               <span class="c-type pl-muted">{TYPE_LABEL[n.plannerType]}</span>
@@ -204,7 +209,7 @@ export function ListView({ snap, root, selectedId, onSelect, onOpen }: Props) {
                 <span class={`pl-pill ${STATUS_CLASS[n.status]}`}>{statusLabel(n.status)}</span>
               </span>
               <span class="c-owner">{owner(n)}</span>
-              <span class="c-domain pl-muted">{domainLabel(n.domain)}</span>
+              <span class="c-domain pl-muted">{domainLabel(n.effectiveDomain)}</span>
               <span class={r?.overdue && n.due && n.due < snap.today ? 'pl-overdue' : ''}>{shortDate(n.due, snap.today)}</span>
               <span class="c-progress" title={r && r.total ? `${r.done} of ${r.total} tasks done · priority ${PRIORITY_LABEL[n.priority]}` : ''}>
                 {r?.percent !== null && r?.percent !== undefined && (

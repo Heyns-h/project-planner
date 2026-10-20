@@ -1,14 +1,19 @@
 import { stemOf } from './classify';
+import { isLinkTarget } from './hub';
 import { parseNode, parsePerson, parseTagList } from './parse';
 import type { DomainDef, Graph, PlannerNode, RepoFile, Stem } from './types';
 import { validateGraph } from './validate';
 
 // The in-memory graph. Rebuilt from the local cache after each pull or edit:
 // a full rebuild over ~1,000 nodes is a few milliseconds, and the UI keeps its
-// own view state, so nothing visible is lost. Children and `blocks` are
-// derived here, never stored (blueprint §4.2).
+// own view state, so nothing visible is lost. Children, `blocks` and the
+// effective domain are derived here, never stored (blueprint v0.3 §4.1, §4.2).
 
 export function buildGraph(files: readonly RepoFile[], indexPaths: readonly string[], domains: readonly DomainDef[]): Graph {
+  // The link space (v0.3 §4.8 rules 3 and 7): nodes/, people/ and docs/.
+  const linkPaths = new Set([...indexPaths, ...files.map((f) => f.path)].filter(isLinkTarget));
+  const stemCount = new Map<Stem, number>();
+  for (const p of linkPaths) stemCount.set(stemOf(p), (stemCount.get(stemOf(p)) ?? 0) + 1);
   const g: Graph = {
     nodes: new Map(),
     byStem: new Map(),
@@ -16,11 +21,10 @@ export function buildGraph(files: readonly RepoFile[], indexPaths: readonly stri
     blocks: new Map(),
     people: new Map(),
     tags: new Map(),
-    allStems: new Set(indexPaths.filter((p) => p.endsWith('.md')).map(stemOf)),
+    allStems: new Set(stemCount.keys()),
   };
 
   for (const f of files) {
-    g.allStems.add(stemOf(f.path));
     const node = parseNode(f, domains);
     if (node) {
       if (g.nodes.has(node.id)) {
@@ -28,6 +32,9 @@ export function buildGraph(files: readonly RepoFile[], indexPaths: readonly stri
         node.problems.push({ code: 'bad-value', severity: 'error', field: 'planner_id', message: `planner_id ${node.id} is also used by ${g.nodes.get(node.id)?.path ?? 'another file'}` });
         node.readOnly = true;
         node.id = `${node.id}#${node.path}`;
+      }
+      if ((stemCount.get(node.stem) ?? 0) > 1) {
+        node.problems.push({ code: 'duplicate-stem', severity: 'warning', message: `Another file in nodes/, people/ or docs/ is also named ${node.stem}.md, so [[${node.stem}]] is ambiguous` });
       }
       g.nodes.set(node.id, node);
       g.byStem.set(node.stem, node.id);
@@ -51,6 +58,13 @@ export function buildGraph(files: readonly RepoFile[], indexPaths: readonly stri
     }
   }
   for (const list of g.children.values()) list.sort((a, b) => compareNodes(g.nodes.get(a), g.nodes.get(b)));
+
+  // Effective domain: the root project's stored domain (v0.3 §4.1).
+  for (const n of g.nodes.values()) {
+    const chain = ancestors(g, n.id);
+    const root = chain.length ? chain[chain.length - 1] : n;
+    n.effectiveDomain = root?.domain || n.domain;
+  }
 
   validateGraph(g);
   return g;

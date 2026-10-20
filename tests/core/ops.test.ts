@@ -4,8 +4,8 @@ import { checkOp, replay, resolveConflict } from '../../src/core/ops';
 import type { Conflict, Op, QueuedOp } from '../../src/core/types';
 import { DOMAINS, FILES, indexPaths, repoFiles } from '../fixtures/repo';
 
-const TAGS = '01-Alpha/_alpha-tags.md';
-const GANGERS = '01-Alpha/07-planner/paint-gangers.md';
+const TAGS = 'tags/alpha.md';
+const GANGERS = 'nodes/alpha/paint-gangers.md';
 
 describe('addTag with the edit that uses it (plan Phase 2 §5)', () => {
   const g = buildGraph(repoFiles(), indexPaths(), DOMAINS);
@@ -20,7 +20,7 @@ describe('addTag with the edit that uses it (plan Phase 2 §5)', () => {
     expect(checkOp(g, batch[0]!)).toBeNull();
     expect(checkOp(g, { kind: 'addTag', domain: 'alpha', tag: 'painting', meaning: 'x' })).toMatch(/already/);
     expect(checkOp(g, { kind: 'addTag', domain: 'alpha', tag: 'Not Kebab', meaning: 'x' })).toMatch(/lower-case/);
-    expect(checkOp(g, { kind: 'addTag', domain: 'beta', tag: 'rush', meaning: 'x' })).toMatch(/no tag list/);
+    expect(checkOp(g, { kind: 'addTag', domain: 'gamma', tag: 'rush', meaning: 'x' })).toMatch(/no tag list/);
   });
 
   it('replays as one row in the table plus the note edit, and holds both on a conflict', () => {

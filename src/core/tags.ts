@@ -1,4 +1,4 @@
-// Domain tag lists live in `<domain>/_<domain>-tags.md` as a markdown table
+// Domain tag lists live in `tags/<domain>.md` as a markdown table
 // under a "Vocabulary" heading; the first column holds the tag in backticks.
 // Placeholder rows ("—") are ignored.
 

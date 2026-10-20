@@ -4,7 +4,7 @@ import { detectDomains } from '../core/domains';
 import { buildGraph, nodeByStem } from '../core/graph';
 import { checkOp, fieldValue, replay, resolveConflict, sameValue, type Resolution } from '../core/ops';
 import { computeRollups, type Rollup } from '../core/rollup';
-import { peopleFolder, plannerFolder } from '../core/serialize';
+import { nodeFolder, peopleFolder } from '../core/hub';
 import { slugify, uniqueStem } from '../core/slug';
 import type { Domain, DomainDef, Field, Graph, NewNode, Op, QueuedOp, RepoConfig, Stem } from '../core/types';
 import { Store } from '../store/db';
@@ -170,10 +170,14 @@ export class Session {
     this.set({ status: { s: 'syncing' } });
     try {
       const r = await sync(gh, store, { branch: config.branch, device: config.device, domains: config.domains, today: localToday });
-      if (config.domains.length === 0 && r.pulled.changed) {
-        const updated = { ...config, domains: detectDomains((await store.allIndex()).map((e) => e.path)) };
-        await store.setMeta('config', updated);
-        this.set({ config: updated });
+      if (r.pulled.changed || config.domains.length === 0) {
+        // Domains are the tag files (v0.3 §4.1): re-read them after every pull that changed something.
+        const domains = detectDomains(await store.allFiles());
+        if (JSON.stringify(domains) !== JSON.stringify(config.domains)) {
+          const updated = { ...config, domains };
+          await store.setMeta('config', updated);
+          this.set({ config: updated });
+        }
       }
       this.set({ status: { s: 'idle' } });
     } catch (e) {
@@ -274,14 +278,15 @@ export class Session {
     const g = this.snap.graph;
     const parent = input.parent ? nodeByStem(g, input.parent) : undefined;
     if (input.parent && !parent) return { error: 'The parent must be a planner item.' };
-    const domain = parent?.domain ?? input.domain;
+    // Born in the parent's effective domain (v0.3 §4.1); a top-level project names its own.
+    const domain = parent?.effectiveDomain ?? input.domain;
     if (!domain) return { error: 'Choose a domain for a top-level project.' };
     const def = this.domainDef(domain);
     if (!def) return { error: `Unknown domain "${domain}".` };
     const id = newId();
     const stem = uniqueStem(input.title, this.takenStems());
     const node: NewNode = { ...input, id, domain };
-    const error = await this.act(`add '${input.title.trim()}'`, [{ kind: 'create', node, path: `${plannerFolder(def.folder)}/${stem}.md` }]);
+    const error = await this.act(`add '${input.title.trim()}'`, [{ kind: 'create', node, path: `${nodeFolder(def.id)}/${stem}.md` }]);
     return error ? { error } : { error: null, id };
   }
 
@@ -296,8 +301,8 @@ export class Session {
     const tag = slugify(name);
     if (!tag) return { error: 'The tag needs a name.' };
     const tags = n.tags.includes(tag) ? n.tags : [...n.tags, tag];
-    const error = await this.act(`add tag '${tag}' to ${n.domain}; edit '${n.title}' (tags)`, [
-      { kind: 'addTag', domain: n.domain, tag, meaning: meaning.trim() },
+    const error = await this.act(`add tag '${tag}' to ${n.effectiveDomain}; edit '${n.title}' (tags)`, [
+      { kind: 'addTag', domain: n.effectiveDomain, tag, meaning: meaning.trim() },
       { kind: 'set', nodeId, field: 'tags', from: n.tags, to: tags },
     ]);
     return error ? { error } : { error: null, tag };
@@ -307,7 +312,7 @@ export class Session {
     const def = this.domainDef(domain);
     if (!def) return { error: `Unknown domain "${domain}".` };
     const stem = uniqueStem(name, this.takenStems());
-    const error = await this.act(`add person '${name.trim()}'`, [{ kind: 'createPerson', person: { name, domain }, path: `${peopleFolder(def.folder)}/${stem}.md` }]);
+    const error = await this.act(`add person '${name.trim()}'`, [{ kind: 'createPerson', person: { name, domain }, path: `${peopleFolder()}/${stem}.md` }]);
     return error ? { error } : { error: null, stem };
   }
 

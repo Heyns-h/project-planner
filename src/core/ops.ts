@@ -1,5 +1,6 @@
 import { stemOf } from './classify';
-import { parseNode } from './parse';
+import { tagsPath } from './hub';
+import { homeProblem, parseNode } from './parse';
 import { addTagRow, applyEdits, newNodeContent, newPersonContent } from './serialize';
 import { uniqueStem } from './slug';
 import type { Conflict, DomainDef, Field, Graph, Op, PlannerNode, QueuedOp, Stem } from './types';
@@ -162,7 +163,7 @@ export function replay(base: ReadonlyMap<string, string>, queue: readonly Queued
         newStems.push(stemOf(path));
         applied.push(q.opId);
       } else if (op.kind === 'addTag') {
-        const path = [...scratch.keys()].find((p) => p.endsWith(`/_${op.domain}-tags.md`));
+        const path = scratch.has(tagsPath(op.domain)) ? tagsPath(op.domain) : undefined;
         if (!path) {
           c('deleted', null, null, op.tag);
           continue;
@@ -225,10 +226,16 @@ export function checkOp(g: Graph, op: Op, batch: readonly Op[] = []): string | n
       case 'references':
         return (v as unknown[]).every(resolves) ? null : 'Every link must be a note in the repo.';
       case 'tags': {
-        const allowed = new Set(g.tags.get(n.domain)?.tags ?? []);
-        for (const o of batch) if (o.kind === 'addTag' && o.domain === n.domain) allowed.add(o.tag);
+        const allowed = new Set(g.tags.get(n.effectiveDomain)?.tags ?? []);
+        for (const o of batch) if (o.kind === 'addTag' && o.domain === n.effectiveDomain) allowed.add(o.tag);
         const bad = (v as string[]).filter((t) => !allowed.has(t));
-        return bad.length ? `Not in the ${n.domain} tag list: ${bad.join(', ')}` : null;
+        return bad.length ? `Not in the ${n.effectiveDomain} tag list: ${bad.join(', ')}` : null;
+      }
+      case 'repo':
+      case 'folder': {
+        if (n.plannerType !== 'project') return 'Only a project has a home.';
+        const s = v === null || v === undefined ? '' : String(v).trim();
+        return s ? homeProblem(op.field, s) : null;
       }
       case 'start':
       case 'due':
@@ -244,6 +251,14 @@ export function checkOp(g: Graph, op: Op, batch: readonly Op[] = []): string | n
     if (p !== null && !g.byStem.has(p)) return 'The parent must be a planner item.';
     if (!op.node.title.trim()) return 'The title cannot be empty.';
     if (g.allStems.has(stemOf(op.path))) return 'That file name is taken.';
+    if (op.node.repo) {
+      const m = homeProblem('repo', op.node.repo);
+      if (m) return m;
+    }
+    if (op.node.folder) {
+      const m = homeProblem('folder', op.node.folder);
+      if (m) return m;
+    }
     return null;
   }
   if (op.kind === 'createPerson') return op.person.name.trim() ? null : 'The name cannot be empty.';

@@ -5,7 +5,7 @@ import { applyEdits, newNodeContent } from '../../src/core/serialize';
 import type { Field } from '../../src/core/types';
 import { DOMAINS, FILES, indexPaths, repoFiles } from '../fixtures/repo';
 
-const PATH = '02-Beta/07-planner/confirm-quote.md';
+const PATH = 'nodes/beta/confirm-quote.md';
 const ORIGINAL = FILES[PATH]!;
 
 /** Lines that differ between two versions of a file, as [before, after]. */
@@ -75,7 +75,7 @@ describe('newNodeContent', () => {
   });
 
   it('parses back to the same node with no problems, inside a real graph', () => {
-    const path = '02-Beta/07-planner/order-12-crates-rush.md';
+    const path = 'nodes/beta/order-12-crates-rush.md';
     const g = buildGraph(repoFiles({ [path]: content }), indexPaths({ [path]: content }), DOMAINS);
     const n = [...g.nodes.values()].find((x) => x.id === '01TEST')!;
     expect(n).toMatchObject({ title: 'Order: 12 crates # rush', parent: 'q4-sourcing', owner: 'someone', blockedBy: ['paint-gangers'], due: '2026-10-20', status: 'idea', domain: 'beta' });

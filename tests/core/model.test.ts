@@ -51,7 +51,7 @@ describe('tag lists', () => {
 
 describe('parse', () => {
   it('reads a v0.2 node with no problems', () => {
-    const n = parseNode({ path: '02-Beta/07-planner/confirm-quote.md', sha: 'x', content: FILES['02-Beta/07-planner/confirm-quote.md']! }, DOMAINS)!;
+    const n = parseNode({ path: 'nodes/beta/confirm-quote.md', sha: 'x', content: FILES['nodes/beta/confirm-quote.md']! }, DOMAINS)!;
     expect(n).toMatchObject({
       id: 'N7',
       stem: 'confirm-quote',
@@ -70,7 +70,7 @@ describe('parse', () => {
 
   it('flags missing guide keys, a title: key and dotpm-style values', () => {
     const content = '---\nplanner_id: X\ntitle: Old\nstatus: todo\nplanner_type: epic\n---\n';
-    const n = parseNode({ path: '01-Alpha/07-planner/old.md', sha: 'x', content }, DOMAINS)!;
+    const n = parseNode({ path: 'nodes/alpha/old.md', sha: 'x', content }, DOMAINS)!;
     const codes = n.problems.map((p) => `${p.code}:${p.field ?? ''}`);
     expect(codes).toContain('missing-key:aliases');
     expect(codes).toContain('title-key:title');
@@ -81,8 +81,8 @@ describe('parse', () => {
   });
 
   it('makes files with conflict markers read-only', () => {
-    const content = FILES['01-Alpha/07-planner/hive.md'] + '<<<<<<< HEAD\na\n=======\nb\n>>>>>>> x\n';
-    const n = parseNode({ path: '01-Alpha/07-planner/hive.md', sha: 'x', content }, DOMAINS)!;
+    const content = FILES['nodes/alpha/hive.md'] + '<<<<<<< HEAD\na\n=======\nb\n>>>>>>> x\n';
+    const n = parseNode({ path: 'nodes/alpha/hive.md', sha: 'x', content }, DOMAINS)!;
     expect(n.readOnly).toBe(true);
   });
 });
@@ -108,15 +108,15 @@ describe('graph', () => {
 
   it('resolves links against every note name, including notes not downloaded', () => {
     expect(node(g, 'confirm-quote').problems).toEqual([]);
-    const broken = graph({ '02-Beta/07-planner/x.md': nodeText({ id: 'N9', type: 'task', title: 'X', domain: 'beta', parent: 'q4-sourcing', blockedBy: ['missing-note'] }) });
+    const broken = graph({ 'nodes/beta/x.md': nodeText({ id: 'N9', type: 'task', title: 'X', domain: 'beta', parent: 'q4-sourcing', blockedBy: ['missing-note'] }) });
     expect(node(broken, 'x').problems.map((p) => p.code)).toEqual(['unresolved-link']);
   });
 
   it('warns on hierarchy rules and detects cycles', () => {
     const bad = graph({
-      '01-Alpha/07-planner/sub-under-task.md': nodeText({ id: 'S1', type: 'subproject', title: 'S', domain: 'alpha', parent: 'paint-gangers' }),
-      '01-Alpha/07-planner/loop-a.md': nodeText({ id: 'L1', type: 'task', title: 'A', domain: 'alpha', parent: 'loop-b' }),
-      '01-Alpha/07-planner/loop-b.md': nodeText({ id: 'L2', type: 'task', title: 'B', domain: 'alpha', parent: 'loop-a' }),
+      'nodes/alpha/sub-under-task.md': nodeText({ id: 'S1', type: 'subproject', title: 'S', domain: 'alpha', parent: 'paint-gangers' }),
+      'nodes/alpha/loop-a.md': nodeText({ id: 'L1', type: 'task', title: 'A', domain: 'alpha', parent: 'loop-b' }),
+      'nodes/alpha/loop-b.md': nodeText({ id: 'L2', type: 'task', title: 'B', domain: 'alpha', parent: 'loop-a' }),
     });
     expect(node(bad, 'sub-under-task').problems.map((p) => p.code)).toContain('hierarchy');
     expect(node(bad, 'loop-a').problems.map((p) => p.code)).toContain('cycle');
@@ -125,7 +125,7 @@ describe('graph', () => {
   });
 
   it('flags a duplicated planner_id instead of merging the two files', () => {
-    const dup = graph({ '01-Alpha/07-planner/copy.md': nodeText({ id: 'N3', type: 'task', title: 'Copy', domain: 'alpha', parent: 'hive' }) });
+    const dup = graph({ 'nodes/alpha/copy.md': nodeText({ id: 'N3', type: 'task', title: 'Copy', domain: 'alpha', parent: 'hive' }) });
     const copy = node(dup, 'copy');
     expect(copy.readOnly).toBe(true);
     expect(node(dup, 'paint-gangers').readOnly).toBe(false);
@@ -140,7 +140,7 @@ describe('roll-up (blueprint §4.6)', () => {
     // campaign: paint-gangers (active), build-terrain (idea), buy-glue (done) → 1/3
     expect(r.get('N1')).toMatchObject({ done: 1, total: 3, percent: 33 });
     expect(r.get('N5')).toMatchObject({ done: 1, total: 1, percent: 100 });
-    const archived = computeRollups(graph({ '01-Alpha/07-planner/old.md': nodeText({ id: 'A1', type: 'task', title: 'Old', domain: 'alpha', parent: 'hive', status: 'archived' }) }), TODAY);
+    const archived = computeRollups(graph({ 'nodes/alpha/old.md': nodeText({ id: 'A1', type: 'task', title: 'Old', domain: 'alpha', parent: 'hive', status: 'archived' }) }), TODAY);
     expect(archived.get('N1')?.total).toBe(3);
   });
 
@@ -152,13 +152,13 @@ describe('roll-up (blueprint §4.6)', () => {
   });
 
   it('with some open tasks still free, the parent is not blocked but counts the blocked ones (decision 9)', () => {
-    const partial = computeRollups(graph({ '02-Beta/07-planner/free.md': nodeText({ id: 'N8', type: 'task', title: 'Free', domain: 'beta', parent: 'q4-sourcing' }) }), TODAY);
+    const partial = computeRollups(graph({ 'nodes/beta/free.md': nodeText({ id: 'N8', type: 'task', title: 'Free', domain: 'beta', parent: 'q4-sourcing' }) }), TODAY);
     expect(partial.get('N6')).toMatchObject({ blocked: false, openTasks: 2, blockedTasks: 1 });
     // A task under an on-hold parent counts as impeded through that parent.
     const held = computeRollups(
       graph({
-        '02-Beta/07-planner/held.md': nodeText({ id: 'N8', type: 'subproject', title: 'Held', domain: 'beta', parent: 'q4-sourcing', status: 'on-hold' }),
-        '02-Beta/07-planner/under-held.md': nodeText({ id: 'N9', type: 'task', title: 'Under held', domain: 'beta', parent: 'held' }),
+        'nodes/beta/held.md': nodeText({ id: 'N8', type: 'subproject', title: 'Held', domain: 'beta', parent: 'q4-sourcing', status: 'on-hold' }),
+        'nodes/beta/under-held.md': nodeText({ id: 'N9', type: 'task', title: 'Under held', domain: 'beta', parent: 'held' }),
       }),
       TODAY,
     );
@@ -167,7 +167,7 @@ describe('roll-up (blueprint §4.6)', () => {
   });
 
   it('stops blocking once the dependency is done', () => {
-    const done = graph({ '01-Alpha/07-planner/paint-gangers.md': nodeText({ id: 'N3', type: 'task', title: 'Paint gangers', domain: 'alpha', parent: 'hive', status: 'done' }) });
+    const done = graph({ 'nodes/alpha/paint-gangers.md': nodeText({ id: 'N3', type: 'task', title: 'Paint gangers', domain: 'alpha', parent: 'hive', status: 'done' }) });
     expect(computeRollups(done, TODAY).get('N7')?.blocked).toBe(false);
   });
 

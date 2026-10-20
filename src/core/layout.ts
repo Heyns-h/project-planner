@@ -232,7 +232,7 @@ function links(g: Graph, nodes: readonly LayoutNode[]): LayoutLink[] {
         const key = `${from.node.id}>${to.node.id}:${kind}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        out.push({ from, to, kind, cross: from.node.domain !== to.node.domain });
+        out.push({ from, to, kind, cross: from.node.effectiveDomain !== to.node.effectiveDomain });
       }
     }
   }

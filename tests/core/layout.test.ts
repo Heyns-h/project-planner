@@ -10,8 +10,8 @@ import { DOMAINS, indexPaths, nodeText, repoFiles, TODAY } from '../fixtures/rep
 // visible; root switching; archived excluded; sorted by value; everything
 // inside the box; each circle summarises what is inside it.
 
-const A = '01-Alpha/07-planner/';
-const B = '02-Beta/07-planner/';
+const A = 'nodes/alpha/';
+const B = 'nodes/beta/';
 
 function build(extra: Record<string, string> = {}) {
   const g = buildGraph(repoFiles(extra), indexPaths(extra), DOMAINS);

@@ -3,8 +3,8 @@ import type { DomainDef, RepoFile } from '../../src/core/types';
 // Synthetic repo in the v0.2 shape. Generic domain names only: this repo is public.
 
 export const DOMAINS: DomainDef[] = [
-  { id: 'alpha', folder: '01-Alpha', label: 'Alpha' },
-  { id: 'beta', folder: '02-Beta', label: 'Beta' },
+  { id: 'alpha', folder: 'nodes/alpha', label: 'Alpha' },
+  { id: 'beta', folder: 'nodes/beta', label: 'Beta' },
 ];
 
 export const TODAY = '2026-10-01';
@@ -21,6 +21,8 @@ interface N {
   blockedBy?: string[];
   references?: string[];
   tags?: string[];
+  repo?: string;
+  folder?: string;
 }
 
 export function nodeText(n: N): string {
@@ -49,12 +51,13 @@ blocked_by: ${links(n.blockedBy)}
 relates: []
 references: ${links(n.references)}
 drive: []
----
+${n.type === 'project' ? `repo: ${n.repo ? JSON.stringify(n.repo) : '""'}\nfolder: ${n.folder ? JSON.stringify(n.folder) : '""'}\n` : ''}---
 `;
 }
 
-const A = '01-Alpha/07-planner/';
-const B = '02-Beta/07-planner/';
+const A = 'nodes/alpha/';
+const B = 'nodes/beta/';
+/** Tag files carry the domain's display label in aliases[0] (v0.3 §4.1). */
 
 export const FILES: Record<string, string> = {
   [A + 'campaign.md']: nodeText({ id: 'N1', type: 'project', title: 'Campaign', domain: 'alpha', owner: 'someone' }),
@@ -74,7 +77,7 @@ export const FILES: Record<string, string> = {
     blockedBy: ['paint-gangers'], // cross-domain
     references: ['some-reference'],
   }),
-  '02-Beta/06-people/someone.md': `---
+  'people/someone.md': `---
 type: person
 domain: beta
 project: ""
@@ -87,7 +90,28 @@ aliases:
   - Someone
 ---
 `,
-  '01-Alpha/_alpha-tags.md': `---
+  'tags/beta.md': `---
+type: reference
+domain: beta
+project: ""
+version: ""
+status: active
+tags: []
+created: 2026-09-30
+updated: 2026-09-30
+aliases:
+  - Beta
+---
+
+## Vocabulary
+
+| Tag | Means | Added |
+| --- | --- | --- |
+| \`freight\` | Freight | 2026-09-30 |
+
+## Related
+`,
+  'tags/alpha.md': `---
 type: reference
 domain: alpha
 project: ""
@@ -96,7 +120,8 @@ status: active
 tags: []
 created: 2026-09-30
 updated: 2026-09-30
-aliases: []
+aliases:
+  - Alpha
 ---
 
 ## Vocabulary
@@ -111,7 +136,7 @@ aliases: []
 };
 
 /** Names of ordinary notes present in the repo but not downloaded. */
-export const INDEX_ONLY = ['03-Gamma/04-resources/some-reference.md', 'README.md'];
+export const INDEX_ONLY = ['docs/some-reference.md', 'README.md'];
 
 export function repoFiles(extra: Record<string, string> = {}): RepoFile[] {
   return Object.entries({ ...FILES, ...extra }).map(([path, content]) => ({ path, sha: 'x', content }));

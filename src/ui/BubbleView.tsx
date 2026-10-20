@@ -72,6 +72,8 @@ function bucket(k: number): number {
 function insideLines(n: LayoutNode): string[] {
   const lines = typesBelow(n.node.plannerType).map((t) => `${TYPE_PLURAL[t]}: ${n.below[t]}`);
   if (n.attachments > 0) lines.push(`Files: ${n.attachments}`);
+  // A project's home (v0.3 §5): the repo or folder it lives in.
+  if (n.node.repo || n.node.folder) lines.push(`⌂ ${n.node.repo ?? n.node.folder}`);
   return lines;
 }
 

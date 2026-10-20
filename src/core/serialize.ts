@@ -5,10 +5,11 @@ import type { Field, NewNode, NewPerson, Stem } from './types';
 
 // All writes go through here (trial lesson 3): a field edit changes only the
 // lines for that field, plus `updated` when the date moves on. New files are
-// written in the fixed key order of blueprint §4.2 with empty values present.
+// written in the fixed key order of blueprint v0.3 §4.2 with empty values
+// present; the home keys appear on project nodes only.
 
 /** Field → frontmatter key and value shape. */
-const FIELDS: Record<Field, { key: string; kind: 'title' | 'text' | 'date' | 'link' | 'links' | 'list' }> = {
+const FIELDS: Record<Field, { key: string; kind: 'title' | 'text' | 'date' | 'link' | 'links' | 'list' | 'home' }> = {
   title: { key: 'aliases', kind: 'title' },
   status: { key: 'status', kind: 'text' },
   parent: { key: 'parent', kind: 'link' },
@@ -22,6 +23,8 @@ const FIELDS: Record<Field, { key: string; kind: 'title' | 'text' | 'date' | 'li
   relates: { key: 'relates', kind: 'links' },
   references: { key: 'references', kind: 'links' },
   drive: { key: 'drive', kind: 'list' },
+  repo: { key: 'repo', kind: 'home' },
+  folder: { key: 'folder', kind: 'home' },
 };
 
 export function fieldKey(field: Field): string {
@@ -63,6 +66,14 @@ function setField(doc: Document, field: Field, value: unknown): void {
     case 'list': {
       const items = Array.isArray(value) ? value.map(String) : [];
       doc.set(key, doc.createNode(items, { flow: true }));
+      return;
+    }
+    case 'home': {
+      // A project written before v0.3 has neither key: add both, in order, on
+      // the first edit of either (v0.3 §4.2), so the shape stays uniform.
+      if (!doc.has('repo')) doc.set('repo', empty());
+      if (!doc.has('folder')) doc.set('folder', empty());
+      doc.set(key, value === null || value === '' ? empty() : String(value).trim());
       return;
     }
   }
@@ -121,6 +132,8 @@ export function newNodeContent(n: NewNode, today: string): string {
     'relates: []',
     'references: []',
     'drive: []',
+    // Home keys on project nodes only (v0.3 §4.7).
+    ...(n.plannerType === 'project' ? [`repo: ${n.repo ? q(n.repo) : '""'}`, `folder: ${n.folder ? q(n.folder) : '""'}`] : []),
     '---',
     '',
   ];
@@ -128,17 +141,7 @@ export function newNodeContent(n: NewNode, today: string): string {
   return lines.join('\n') + (body ? `${body}\n` : '');
 }
 
-/** Folder for new nodes in a domain: `<domain folder>/07-planner/`. */
-export function plannerFolder(domainFolder: string): string {
-  return `${domainFolder}/07-planner`;
-}
-
-/** Folder for new people in a domain: `<domain folder>/06-people/` (vault guide §3). */
-export function peopleFolder(domainFolder: string): string {
-  return `${domainFolder}/06-people`;
-}
-
-/** A person note in the shape of the vault's tpl-person template, written directly. */
+/** A person note (v0.3 §4.4): the nine common keys and a short body. */
 export function newPersonContent(p: NewPerson, today: string): string {
   return [
     '---',

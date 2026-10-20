@@ -7,11 +7,11 @@
  */
 export type Domain = string;
 
-/** One domain of the target repo, supplied by settings rather than hard-coded. */
+/** One domain of the hub, detected from `tags/<domain>.md` (blueprint v0.3 §4.1). */
 export interface DomainDef {
-  id: Domain; // value used in `domain:` frontmatter
-  folder: string; // top-level folder, e.g. "01-Example"
-  label: string; // display name
+  id: Domain; // value used in `domain:` frontmatter; the tag file's stem
+  folder: string; // where new nodes are born: `nodes/<id>`
+  label: string; // display name: the tag file's aliases[0]
 }
 
 /** Hierarchy, top down. A sub-task sits under a task (decision 16, 2026-10-02). */
@@ -40,7 +40,9 @@ export type ProblemCode =
   | 'hierarchy'
   | 'cycle'
   | 'conflict-markers'
-  | 'unparseable';
+  | 'unparseable'
+  | 'key-order'
+  | 'duplicate-stem';
 
 export interface Problem {
   code: ProblemCode;
@@ -55,7 +57,10 @@ export interface PlannerNode {
   stem: Stem;
   title: string; // aliases[0] ?? stem
   plannerType: PlannerType;
+  /** Stored domain: where the node was born. Never rewritten (v0.3 §4.1). */
   domain: Domain;
+  /** The domain the node is shown under: its root project's, derived by graph.ts. */
+  effectiveDomain: Domain;
   status: StoredStatus;
   parent: Stem | null;
   priority: Priority;
@@ -68,6 +73,9 @@ export interface PlannerNode {
   relates: Stem[];
   references: Stem[];
   drive: string[];
+  /** Project home (v0.3 §4.7): present on project nodes only; null elsewhere. */
+  repo: string | null; // GitHub owner/name
+  folder: string | null; // a folder name, never a path
   created: string;
   updated: string;
   body: string;
@@ -112,7 +120,9 @@ export type Field =
   | 'blockedBy'
   | 'relates'
   | 'references'
-  | 'drive';
+  | 'drive'
+  | 'repo'
+  | 'folder';
 
 /** Input for a new node file (serialize.newNodeContent). */
 export interface NewNode {
@@ -128,6 +138,8 @@ export interface NewNode {
   start?: string | null;
   due?: string | null;
   blockedBy?: Stem[];
+  repo?: string | null; // projects only
+  folder?: string | null;
   body?: string;
 }
 
