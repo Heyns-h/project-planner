@@ -11,3 +11,27 @@ sandbox-clone/
 .claude/
 docs/
 *.local.test.ts
+
+# Per-machine, never synced
+.machine
+.drive
+.work/
+
+# Working files belong in Google Drive
+*.docx
+*.xlsx
+*.pptx
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.zip
+# The app icons are source, not working files
+!public/icons/*.png
+
+# Secrets
+.env
+*.token
+
+# OS cruft
+desktop.ini

@@ -1,8 +1,14 @@
-# Project Planner
+# project-planner
+
+**Status:** active
+**Goal:** An installable, offline-first planner for projects, sub-projects and tasks, where every item is a markdown note in a private git repository the app reads and writes through GitHub's API.
+**Working files:** https://drive.google.com/drive/folders/1HnmJWgCSAEpHQQzEsnxKqm8dHzFgCghy
+
+## What this is
 
 An installable, offline-first planner for projects, sub-projects and tasks. Every item is a markdown note in a private git repo; the app reads and writes it through GitHub's API and keeps working offline, syncing when the connection returns.
 
-This repo holds only the app. It contains no planner data, and needs a GitHub token (entered per device, stored only in that browser) to see any. Which domains (top-level areas) a repo has is configuration, not code.
+This repo holds the app and the project's notes. It contains no planner data, and needs a GitHub token (entered per device, stored only in that browser) to see any. Which domains (top-level areas) a repo has is configuration, not code.
 
 ## Develop
 
@@ -17,3 +23,7 @@ npm run preview    # serve dist/ at http://localhost:4173/project-planner/
 ```
 
 Pushes to `main` run typecheck, tests and build, then deploy to GitHub Pages.
+
+## Notes
+
+Meeting records, decisions and plans are in notes/, newest first by filename. The blueprints and phase plans that shaped the app are there.
